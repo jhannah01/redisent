@@ -1,3 +1,6 @@
 aioredis
+discord
+dateparser
 IPython
 jupyterlab
+setuptools

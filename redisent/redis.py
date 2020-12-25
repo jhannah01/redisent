@@ -66,6 +66,17 @@ class RedisHelper:
             return await redis.delete(key) > 0
 
     @staticmethod
+    async def hdelete(key: str, name: str, missing_okay: bool = False, pool_or_conn: RedisPoolConnType = None) -> Optional[bool]:
+        if not await RedisHelper.hexists(key, name, pool_or_conn=pool_or_conn):
+            if missing_okay:
+                return None
+
+            raise RedisError(f'Unable to delete Redis entry for "{name}" in key "{key}": No such entry in "{key}"')
+
+        async with wrapped_redis(pool_or_conn, operation_name='hdel("{key}", "{name}")') as redis:
+            return await redis.hdel(key, name) > 0
+
+    @staticmethod
     async def hexists(key: str, name: str, pool_or_conn: RedisPoolConnType = None) -> bool:
         async with wrapped_redis(pool_or_conn, operation_name=f'hexists("{key}", "{name}")') as redis:
             return await redis.hexists(key, name)
