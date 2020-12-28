@@ -1,6 +1,10 @@
 aioredis
 discord
+discord-py-slash-command
 dateparser
 IPython
 jupyterlab
 setuptools
+mockaioredis
+pytest
+fakeredis

@@ -4,35 +4,18 @@ import aioredis
 import dateparser
 import logging
 
-from contextlib import asynccontextmanager
 from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Union, Optional, Any, Mapping
 
-from redisent.errors import RedisError
-
-# Constants / Complex Types
-RedisPoolConnType = Union[aioredis.Redis, aioredis.ConnectionsPool, aioredis.RedisConnection]
-REDIS_URL: str = 'redis://rpi04.synistree.com'
 
 logger = logging.getLogger(__name__)
 
+# Constants / Complex Types
+RedisPoolConnType = Union[aioredis.Redis, aioredis.ConnectionsPool, aioredis.RedisConnection]
 
-@asynccontextmanager
-async def wrapped_redis(pool_or_conn: RedisPoolConnType = None, operation_name: str = None):
-    try:
-        pool_or_conn = pool_or_conn or await aioredis.create_redis_pool(REDIS_URL)
-    except Exception as ex:
-        raise RedisError(f'Error attempting to connect to "{REDIS_URL}": {ex}', base_exception=ex, related_command=operation_name)
-
-    try:
-        logger.debug(f'Executing Redis command for "{operation_name}"...')
-        yield pool_or_conn
-    except Exception as ex:
-        raise RedisError(f'Redis Error executing "{operation_name or "Unknown"}": {ex}', base_exception=ex, related_command=operation_name)
-    finally:
-        pool_or_conn.close()
-        await pool_or_conn.wait_closed()
+REDIS_URL: str = 'redis://rpi04.synistree.com'
+LOG_LEVEL: int = logging.INFO
 
 
 @dataclass
