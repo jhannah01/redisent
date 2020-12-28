@@ -13,3 +13,6 @@ __pycache__/
 .azure/
 .idea/
 ipy/.ipynb_checkpoints
+/.coverage
+/.tox/
+/report/

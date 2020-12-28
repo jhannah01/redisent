@@ -1,3 +1,5 @@
+import distutils
+
 import aioredis
 import pytest
 import mockaioredis
@@ -6,6 +8,7 @@ import fakeredis.aioredis
 from async_generator import yield_, async_generator
 
 pytestmark = [pytest.mark.asyncio]
+
 
 @pytest.fixture(scope="session")
 def is_redis_running():

@@ -3,7 +3,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from redisent.errors import RedisError
-from redisent.redis import RedisHelper, wrapped_redis
+from redisent.redis import RedisHelper
 from redisent.utils import REDIS_URL
 from redisent.models import RedisEntry, RedisHashEntry
 
@@ -27,4 +27,4 @@ def setup_logger(log_level: int = logging.DEBUG, squelch: bool = False):
 
 setup_logger(log_level=LOG_LEVEL, squelch=TYPE_CHECKING)
 
-__all__ = ['RedisError', 'RedisHelper', 'RedisEntry', 'RedisHashEntry', 'REDIS_URL', 'wrapped_redis']
+__all__ = ['RedisError', 'RedisHelper', 'RedisEntry', 'RedisHashEntry', 'REDIS_URL']

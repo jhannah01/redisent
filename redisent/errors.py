@@ -1,11 +1,11 @@
-from typing import Mapping, Any
+from typing import Mapping, Any, Optional
 
 
 class RedisError(Exception):
     message: str
 
-    base_exception: Exception = None
-    related_command: str = None
+    base_exception: Optional[Exception]
+    related_command: str
     extra_attrs: Mapping[str, Any] = {}
 
     def __init__(self, message: str, base_exception: Exception = None, related_command: str = None, extra_attrs: Mapping[str, Any] = None) -> None:
@@ -13,7 +13,7 @@ class RedisError(Exception):
 
         self.message = message
         self.base_exception = base_exception
-        self.related_command = related_command
+        self.related_command = related_command or 'Unknown'
         self.extra_attrs = extra_attrs or {}
 
     def __repr__(self) -> str:

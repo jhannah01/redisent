@@ -7,4 +7,10 @@ jupyterlab
 setuptools
 mockaioredis
 pytest
+pytest-asyncio
+pytest-mock
+pytest-cov
+pytest-mypy
+mypy
+coverage
 fakeredis

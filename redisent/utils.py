@@ -6,8 +6,7 @@ import logging
 
 from datetime import datetime
 from dataclasses import dataclass, field
-from typing import Union, Optional, Any, Mapping
-
+from typing import Union, Optional, Any, Mapping, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ LOG_LEVEL: int = logging.INFO
 class FuzzyTime:
     provided_when: str = field()
 
-    created_time: datetime = datetime.now()
+    created_time: datetime = field()
     resolved_time: datetime = field(init=False)
 
     @property
@@ -53,13 +52,10 @@ class FuzzyTime:
 
     @classmethod
     def build(cls, provided_when: str, created_ts: Union[float, int, datetime] = None) -> FuzzyTime:
-        kwargs = {'provided_when': provided_when}
+        kwargs: Dict[str, Any] = {'provided_when': provided_when}
 
         if created_ts:
-            if isinstance(created_ts, (int, float,)):
-                created_ts = datetime.fromtimestamp(created_ts)
-
-            kwargs['created_time'] = created_ts
+            kwargs['created_time'] = datetime.fromtimestamp(created_ts) if isinstance(created_ts, (int, float,)) else created_ts
 
         return FuzzyTime(**kwargs)
 
