@@ -11,6 +11,7 @@ pytest-asyncio
 pytest-mock
 pytest-cov
 pytest-mypy
+redis
 mypy
 coverage
 fakeredis

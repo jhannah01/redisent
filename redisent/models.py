@@ -4,10 +4,10 @@ import logging
 import pickle
 
 from dataclasses import is_dataclass, dataclass, field, fields, asdict
-from typing import Mapping, Any, Union, List, Optional
+from typing import Mapping, Any, Union, List, Optional, Dict
 
 from redisent import RedisError
-from redisent.redis import RedisHelper
+from redisent.redishelper import RedisHelper
 from redisent.utils import RedisPoolConnType
 
 logger = logging.getLogger(__name__)
@@ -18,8 +18,11 @@ class RedisEntry:
     redis_id: str
     redis_name: Optional[str] = field(default=None)
     store_encoded: bool = field(default=True)
-    is_hashmap: bool = field(default=True)
 
+    is_hashmap: bool = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.is_hashmap = True if self.redis_name else False
 
     def __new__(cls, *args, **kwargs):
         if not is_dataclass(cls):
@@ -60,9 +63,10 @@ class RedisEntry:
         return self.get_field_names()
 
     @classmethod
-    def from_dict(cls, entry_dict: Mapping[str, Any]) -> RedisEntry:
+    def from_dict(cls, redis_id: str, entry_dict: Mapping[str, Any], redis_name: str = None, store_encoded: bool = None) -> RedisEntry:
+        store_encoded = store_encoded if store_encoded is not None else True
         ent_kwargs = {}
-        flds = cls.field_names
+        flds = cls.get_field_names()
 
         for fld, val in entry_dict.items():
             if fld not in flds:
@@ -71,7 +75,7 @@ class RedisEntry:
 
             ent_kwargs[fld] = val
 
-        return cls(**ent_kwargs)
+        return cls(redis_id=redis_id, redis_name=redis_name, store_encoded=store_encoded, **ent_kwargs)
 
     @classmethod
     async def from_redis(cls, helper: RedisHelper, redis_id: str, redis_name: str = None, is_hashmap: bool = True, missing_okay: bool = False, is_encoded: bool = True) -> Optional[RedisEntry]:
@@ -108,64 +112,3 @@ class RedisEntry:
         await helper.set(self.redis_id, self.to_dict(), encode_value=True)
 
 
-@dataclass
-class RedisHashEntry(RedisEntry):
-    redis_name: str = field(default_factory=str)
-
-    def __init__(self, redis_id: str, redis_name: str, *args, **kwargs) -> None:
-        super(RedisHashEntry, self).__init__(redis_id, *args, **kwargs)
-        self.redis_name = redis_name
-
-    @classmethod
-    async def from_redis(cls, helper: RedisHelper, redis_id: str, redis_name: str = None, decode_value: bool = True) -> Mapping[str, RedisHashEntry]:
-
-        if not redis_name:
-            redis_entires = await helper.hgetall(redis_id, decode_value=decode_value, pool=pool)
-        else:
-            if ':' not in redis_name:
-                (l_val, r_val) = redis_name.split(':')
-
-                if l_val == '*' and r_val == '*':
-                    raise RedisError(f'Unable to look up Redis entries for "{redis_id}" with pattern "{redis_name}": Both sides are wildcards')
-
-                query_val = l_val if r_val == '*' else r_val
-                redis_entries = await helper.hgetall(redis_id, decode_value=decode_value, pool=pool)
-
-                if not redis_entries:
-                    return {}
-
-            if not await helper.hexists(redis_id, redis_name, pool=pool):
-                raise RedisError(f'Unable to find Redis entry under "{redis_id}" for key "{redis_name}"')
-
-            entries = await helper.hget(redis_id, redis_name, decode_value=decode_value, pool=pool)
-            entries = {ent_key: env_value for ent_key, env_value in redis_entries.items() if query_val == ent_key}
-            entries = await helper.hgetall(redis_id, pool=pool)
-
-        if not entries:
-            logger.debug(f'No entries found for "{redis_name}" in hash key "{redis_id}"')
-            return {}
-
-        entry_fields = [fld.name for fld in fields(cls)]
-
-        for ent_name, ent_dict in entries.items():
-            cls_kwargs = {}
-
-            for attr_name, attr_value in ent_dict.items():
-                if attr_name.startswith('_') or attr_name not in entry_fields:
-                    logger.debug(f'Skipping internal field / missing field "{attr_name}" (value: {attr_value}). No such field in "{cls.__name__}"')
-                    continue
-
-                cls_kwargs[attr_name] = attr_value
-
-            entries[ent_name] = cls(redis_id=redis_id, redis_name=redis_name, **cls_kwargs)
-
-        return entries
-
-    async def to_redis(self, helper: RedisHelper, use_redis_id: str = None, use_redis_name: str = None, pool: RedisPoolConnType = None) -> None:
-        redis_id = use_redis_id or self.redis_id
-        redis_name = use_redis_name or self.redis_name
-
-        if await helper.hexists(redis_id, redis_name, pool=pool):
-            print(f'Overwriting Redis entry for in "{self.redis_id}" for "{redis_name}" in Redis (already exists)')
-
-        await helper.hset(redis_id, redis_name, self.to_dict(), encode_value=True, pool=pool)
