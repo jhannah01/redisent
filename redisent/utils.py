@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import aioredis
+import redis
 import dateparser
 import logging
 
@@ -11,7 +12,6 @@ from typing import Union, Optional, Any, Mapping, Dict
 logger = logging.getLogger(__name__)
 
 # Constants / Complex Types
-RedisPoolConnType = Union[aioredis.Redis, aioredis.ConnectionsPool, aioredis.RedisConnection]
 
 REDIS_URL: str = 'redis://rpi04.synistree.com'
 LOG_LEVEL: int = logging.INFO

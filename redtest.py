@@ -22,11 +22,10 @@ class RedisHelper:
 
 @dataclass()
 class RedisEntry:
-    helper: RedisHelper = field(repr=False, metadata={'redis_field': True, 'internal': True})
+    helper: RedisHelper = field(repr=False, compare=False, hash=False, metadata={'redis_field': True, 'internal': True})
     redis_id: str = field(metadata={'redis_field': True})
-    store_as_mapping: bool = field(default=False, repr=False, metadata={'redis_field': True})
 
-    redis_name: Optional[str] = field(default=None, metadata={'redis_field': True})
+    redis_name: Optional[str] = field(default_factory=str, metadata={'redis_field': True})
 
     def dump(self) -> str:
         dump_out = f'RedisEntry ({type(self).__name__}) for key "{self.redis_id}"'
@@ -110,12 +109,12 @@ class RedisEntry:
         return RedisEntry.decode_entry(helper, ent_bytes)
 
     def store(self, helper: RedisHelper) -> bool:
-        ent_bytes = RedisEntry.encode_entry(self, as_mapping=self.store_as_mapping)
+        ent_bytes = RedisEntry.encode_entry(self, as_mapping=self.is_hashmap)
 
         if self.is_hashmap:
-            return helper.redis.hset(self.redis_id, self.redis_name, ent_bytes) > 0
-
-        res = helper.redis.set(self.redis_id, ent_bytes)
+            res = helper.redis.hset(self.redis_id, self.redis_name, ent_bytes)
+        else:
+            res = helper.redis.set(self.redis_id, ent_bytes)
 
         return True if res and res > 0 else False
 
@@ -127,7 +126,6 @@ class RedisEntry:
             if isinstance(ent, RedisEntry):
                 return ent
 
-            ent['store_as_mapping'] = True
             return cls.from_dict(helper, **ent)
 
         except Exception as ex:

@@ -7,108 +7,132 @@ from dataclasses import is_dataclass, dataclass, field, fields, asdict
 from typing import Mapping, Any, Union, List, Optional, Dict
 
 from redisent import RedisError
-from redisent.redishelper import RedisHelper
+from redisent.redishelper import AsyncRedisHelper
 from redisent.utils import RedisPoolConnType
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass()
 class RedisEntry:
-    redis_id: str
-    redis_name: Optional[str] = field(default=None)
-    store_encoded: bool = field(default=True)
+    helper: AsyncRedisHelper = field(repr=False, compare=False, hash=False, metadata={'redis_field': True, 'internal': True})
+    redis_id: str = field(metadata={'redis_field': True})
 
-    is_hashmap: bool = field(init=False)
+    redis_name: Optional[str] = field(default_factory=str, metadata={'redis_field': True})
 
-    def __post_init__(self) -> None:
-        self.is_hashmap = True if self.redis_name else False
+    def dump(self) -> str:
+        dump_out = f'RedisEntry ({type(self).__name__}) for key "{self.redis_id}"'
+
+        if self.redis_name:
+            dump_out = f'{dump_out}, hash entry "{self.redis_name}":'
+
+        for attr in self.get_entry_fields(include_redis_fields=False, include_internal_fields=False):
+            dump_out = f'{dump_out}\n=> {attr}\t-> "{getattr(self, attr)}"'
+
+        return dump_out
+
+    @classmethod
+    def get_entry_fields(cls, include_redis_fields: bool = False, include_internal_fields: bool = False) -> List[str]:
+        flds = []
+
+        for fld in fields(cls):
+            is_redis_fld = fld.metadata.get('redis_field', False)
+            is_int_fld = fld.metadata.get('internal_field', False)
+
+            if is_redis_fld and not include_redis_fields:
+                continue
+
+            if is_int_fld and not include_internal_fields:
+                continue
+
+            flds.append(fld.name)
+
+        return flds
+
+    @property
+    def entry_fields(self) -> List[str]:
+        return self.get_entry_fields(include_redis_fields=False, include_internal_fields=False)
+
+    @property
+    def is_hashmap(self) -> bool:
+        return True if self.redis_name else False
 
     def __new__(cls, *args, **kwargs):
         if not is_dataclass(cls):
             raise NotImplementedError(f'All instances of "{cls.__name__}" must be decorated with @dataclass')
 
-        return super(RedisEntry, cls).__new__(cls)
+        return super().__new__(cls)
 
     @classmethod
-    def encode_entry(cls, entry: RedisEntry) -> bytes:
-        try:
-            return pickle.dumps(entry)
-        except pickle.PickleError as ex:
-            raise RedisError(f'Error encoding entry "{entry.redis_id}" with Pickle: {ex}', base_exception=ex, extra_attrs={'entry': entry})
+    def from_dict(cls, helper: AsyncRedisHelper, redis_id: str, redis_name: str = None, **ent_kwargs) -> RedisEntry:
+        if not redis_name:
+            if 'redis_name' in ent_kwargs:
+                redis_name = ent_kwargs.pop('redis_name')
+
+        cls_kwargs = {attr: ent_kwargs[attr] for attr in cls.get_entry_fields(include_redis_fields=False, include_internal_fields=False) if attr in ent_kwargs}
+        # noinspection PyArgumentList
+        return cls(helper=helper, redis_id=redis_id, redis_name=redis_name, **cls_kwargs)
+
+    def as_dict(self, include_redis_attrs: bool = True, include_internal_attrs: bool = False) -> Mapping[str, Any]:
+        ent_dict = asdict(self)
+
+        if include_redis_attrs and include_internal_attrs:
+            return ent_dict
+
+        flds = self.get_entry_fields(include_redis_fields=include_redis_attrs, include_internal_fields=include_internal_attrs)
+        return {attr: value for attr, value in ent_dict.items() if attr in flds}
 
     @classmethod
-    def decode_entry(cls, redis_id: str, entry_bytes: bytes, redis_name: str = None) -> Mapping[str, Any]:
-        try:
-            return pickle.loads(entry_bytes)
-        except pickle.PickleError as ex:
-            red_name = f' (entry: "{redis_name}")'
-            raise RedisError(f'Error decoding entry from Redis for "{redis_id}"{red_name}: {ex}', base_exception=ex,
-                             extra_attrs={'redis_id': redis_id, 'redis_name': redis_name, 'entry_bytes': entry_bytes})
+    def fetch(cls, helper: AsyncRedisHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
+        if not helper.redis.exists(redis_id):
+            raise KeyError(f'No entry found for Redis key "{redis_id}"')
 
-    def to_dict(self, override_attributes: Mapping[str, Any] = None) -> Mapping[str, Any]:
-        entry_dict = {attr: val for attr, val in asdict(self).items() if not attr.startswith('_')}
+        if redis_name:
+            if not helper.redis.hexists(redis_id, redis_name):
+                raise KeyError(f'No hash entry found for Redis key "{redis_id}" for entry "{redis_name}"')
 
-        if override_attributes:
-            entry_dict.update(override_attributes)
-
-        return entry_dict
-
-    @classmethod
-    def get_field_names(cls) -> List[str]:
-        return [fld.name for fld in fields(cls)]
-
-    @property
-    def field_names(self) -> List[str]:
-        return self.get_field_names()
-
-    @classmethod
-    def from_dict(cls, redis_id: str, entry_dict: Mapping[str, Any], redis_name: str = None, store_encoded: bool = None) -> RedisEntry:
-        store_encoded = store_encoded if store_encoded is not None else True
-        ent_kwargs = {}
-        flds = cls.get_field_names()
-
-        for fld, val in entry_dict.items():
-            if fld not in flds:
-                logger.debug(f'Found unexpected field "{fld}" in dictionary. Ignoring (value: "{val}")')
-                continue
-
-            ent_kwargs[fld] = val
-
-        return cls(redis_id=redis_id, redis_name=redis_name, store_encoded=store_encoded, **ent_kwargs)
-
-    @classmethod
-    async def from_redis(cls, helper: RedisHelper, redis_id: str, redis_name: str = None, is_hashmap: bool = True, missing_okay: bool = False, is_encoded: bool = True) -> Optional[RedisEntry]:
-        cls_kwargs = {}
-        fld_names = cls.get_field_names()
-
-        if not is_hashmap:
-            ent_dict = await helper.get(redis_id, missing_okay=missing_okay, decode_value=is_encoded)
+            ent_bytes = helper.redis.hget(redis_id, redis_name)
         else:
-            if not redis_name:
-                raise RedisError(f'Unable to fetching hash map entry from key "{redis_id}" without a provided entry name')
+            ent_bytes = helper.redis.get(redis_id)
 
-            ent_dict = await helper.hget(redis_id, name=redis_name, missing_okay=missing_okay, decode_value=is_encoded)
+        if not ent_bytes:
+            ent_str = f' (entry name: "{redis_name}")' if redis_name else ''
+            raise RedisError(f'No entry data returned from Redis for key "{redis_id}"{ent_str}')
 
-        if is_hashmap:
-            for attr_name, attr_value in ent_dict.items():
-                if attr_name.startswith('_') or attr_name not in fld_names:
-                    logger.debug(f'Skipping internal field / missing field "{attr_name}" (value: {attr_value}). No such field in "{cls.__name__}"')
-                    continue
+        return RedisEntry.decode_entry(helper, ent_bytes)
 
-                cls_kwargs[attr_name] = attr_value
+    def store(self, helper: AsyncRedisHelper) -> bool:
+        ent_bytes = RedisEntry.encode_entry(self, as_mapping=self.is_hashmap)
+
+        if self.is_hashmap:
+            res = helper.redis.hset(self.redis_id, self.redis_name, ent_bytes)
         else:
-            cls_kwargs = ent_dict
+            res = helper.redis.set(self.redis_id, ent_bytes)
 
-        return cls(**cls_kwargs)
+        return True if res and res > 0 else False
 
-    async def to_redis(self, helper: RedisHelper, use_redis_id: str = None) -> None:
-        if use_redis_id:
-            self.redis_id = use_redis_id
+    @classmethod
+    def decode_entry(cls, helper: AsyncRedisHelper, entry_bytes: bytes) -> RedisEntry:
+        try:
+            ent = pickle.loads(entry_bytes)
 
-        if await helper.exists(self.redis_id):
-            print(f'Overwriting Redis entry for "{self.redis_id}" in Redis (already exists)')
+            if isinstance(ent, RedisEntry):
+                return ent
 
-        await helper.set(self.redis_id, self.to_dict(), encode_value=True)
+            return cls.from_dict(helper, **ent)
 
+        except Exception as ex:
+            err_message = f'Error decoding entry using pickle: {ex}'
+            logger.exception(err_message)
+            raise Exception(err_message)
 
+    @classmethod
+    def encode_entry(cls, entry: RedisEntry, as_mapping: bool = None) -> bytes:
+        if as_mapping is None:
+            as_mapping = True if entry.redis_name else False
+
+        try:
+            return pickle.dumps(entry.as_dict(include_redis_attrs=True, include_internal_attrs=False) if as_mapping is True else entry)
+        except Exception as ex:
+            ent_str = f' (entry name: "{entry.redis_name}")' if entry.redis_name else ''
+            raise Exception(f'Error encoding entry for "{entry.redis_id}"{ent_str} using pickle: {ex}')
