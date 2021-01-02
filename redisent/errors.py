@@ -32,6 +32,6 @@ class RedisError(Exception):
         str_out = f'Redis Error '
 
         if self.related_command:
-            str_out = f'{str_out} with command "{self.related_command}"'
+            str_out = f'{str_out}with command "{self.related_command}"'
 
         return f'{str_out}: {self.message}'

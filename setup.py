@@ -1,11 +1,11 @@
-from setuptools import setup, find_packages
+import setuptools
 
 from redisent import __version__  as redisent_version
 
-setup(
+setuptools.setup(
     name='redisent',
     version=redisent_version,
-    packages=find_packages(where='.'),
+    packages=setuptools.find_packages(where='.'),
     url='https://github.com/jhannah01/redisent',
     license='',
     author='Jon Hannah',

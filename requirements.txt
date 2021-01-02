@@ -1,3 +1,4 @@
+aredis
 aioredis
 discord
 discord-py-slash-command

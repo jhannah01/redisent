@@ -3,9 +3,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from redisent.errors import RedisError
-from redisent.redishelper import AsyncRedisHelper
-from redisent.utils import REDIS_URL
-from redisent.models import RedisEntry
+from redisent.helpers import RedisentHelper, BlockingRedisentHelper, AsyncRedisentHelper
 
 
 root_logger = logging.getLogger(__name__)
@@ -27,4 +25,4 @@ def setup_logger(log_level: int = logging.DEBUG, squelch: bool = False):
 
 setup_logger(log_level=LOG_LEVEL, squelch=TYPE_CHECKING)
 
-__all__ = ['RedisError', 'AsyncRedisHelper', 'RedisEntry', 'REDIS_URL']
+__all__ = ['RedisError', 'RedisentHelper', 'BlockingRedisentHelper', 'AsyncRedisentHelper']

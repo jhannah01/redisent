@@ -12,6 +12,8 @@ from typing import Union, Optional, Any, Mapping, Dict
 logger = logging.getLogger(__name__)
 
 # Constants / Complex Types
+RedisPoolType = Union[aioredis.ConnectionsPool, redis.ConnectionPool]
+RedisPrimitiveType = Union[int, float, str, bytes]
 
 REDIS_URL: str = 'redis://rpi04.synistree.com'
 LOG_LEVEL: int = logging.INFO
