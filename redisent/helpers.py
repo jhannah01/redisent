@@ -9,11 +9,10 @@ import redis
 import functools
 
 from contextlib import contextmanager, asynccontextmanager
-from typing import List, Optional, Union, Mapping, Any, Callable
-from pprint import pformat
+from typing import Union, Callable, Optional
 
 from redisent.errors import RedisError
-from redisent.utils import RedisPoolType, REDIS_URL, RedisPrimitiveType
+from redisent.utils import RedisPoolType, REDIS_URL
 
 logger = logging.getLogger(__name__)
 
@@ -22,41 +21,65 @@ class RedisentHelper:
     redis_pool: RedisPoolType
 
     use_async: bool = False
+    _loop: asyncio.AbstractEventLoop
 
     def __init__(self, redis_pool: RedisPoolType, use_async: bool = False) -> None:
         self.redis_pool = redis_pool
         self.use_async = use_async
 
+        if not use_async:
+            return
+
+        self._loop = self.get_event_loop()
+
+    @staticmethod
+    def get_event_loop() -> asyncio.AbstractEventLoop:
+        _loop = asyncio.get_event_loop()
+
+        if _loop:
+            logger.debug(f'Creating new event loop (cannot find running one)')
+            _loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(_loop)
+
+        return _loop
+
+    @property
+    def async_loop(self) -> asyncio.AbstractEventLoop:
+        if not self._loop:
+            self._loop = self.get_event_loop()
+
+        return self._loop
+
+    def cleanup(self) -> bool:
+        if not self.use_async or not isinstance(self.redis_pool, aioredis.ConnectionsPool):
+            return False
+
+        self.redis_pool.close()
+        self._loop.run_until_complete(self.redis_pool.wait_closed())
+        return True
+
+    '''
     def __del__(self):
-        if self.use_async:
-            self.redis_pool.close()
+        self.cleanup()
+        logger.debug('Finished closing async Redis pool after deletion')
+    '''
 
     def decode_entries(self, use_encoding: str = None, first_handler: Callable = None, final_handler: Callable = None):
         def _outer_wrapper(func):
-            @functools.wraps(func)
-            def _blocking_wrapper(*args, **kwargs):
-                res = func(*args, **kwargs)
-                if first_handler:
-                    return first_handler(res)
+            if asyncio.iscoroutinefunction(func):
+                @functools.wraps(func)
+                async def _async_wrapper(*args, **kwargs):
+                    res = await func(*args, **kwargs)
+                    return first_handler(res) if first_handler else self._handle_decode_attempt(res, use_encoding, decode_handler=final_handler)
 
-                return self._handle_decode_attempt(res, use_encoding, decode_handler=final_handler)
+                return _async_wrapper
+            else:
+                @functools.wraps(func)
+                def _blocking_wraper(*args, **kwargs):
+                    res = func(*args, **kwargs)
+                    return first_handler(res) if first_handler else self._handle_decode_attempt(res, use_encoding, decode_handler=final_handler)
 
-            return _blocking_wrapper
-
-        return _outer_wrapper
-
-    def decode_entries_async(self, use_encoding: str = None, first_handler: Callable = None, final_handler: Callable = None):
-        def _outer_wrapper(func):
-            @functools.wraps(func)
-            async def _inner_wrapper(*args, **kwargs):
-                res = await func(*args, **kwargs)
-
-                if first_handler:
-                    return first_handler(res)
-
-                return self._handle_decode_attempt(res, use_encoding, decode_handler=final_handler)
-
-            return _inner_wrapper
+                return _blocking_wraper
 
         return _outer_wrapper
 
@@ -88,22 +111,15 @@ class RedisentHelper:
     @classmethod
     def build(cls, redis_pool: Union[RedisPoolType, str], use_async: bool = False) -> RedisentHelper:
         if isinstance(redis_pool, str):
+            redis_uri = redis_pool if redis_pool.startswith('redis://') else f'redis://{redis_pool}'
+
             if use_async:
                 loop = asyncio.get_event_loop()
-                redis_pool = loop.run_until_complete(cls.build_async_pool(redis_pool))
+                redis_pool = loop.run_until_complete(aioredis.create_redis_pool(redis_uri))
             else:
-                redis_pool = cls.build_blocking_pool(redis_pool)
+                redis_pool = redis.ConnectionPool.from_url(redis_uri)
 
         return cls(redis_pool, use_async)
-
-    @classmethod
-    def build_blocking_pool(cls, redis_url: str = REDIS_URL) -> redis.ConnectionPool:
-        return redis.ConnectionPool.from_url(redis_url)
-
-    @classmethod
-    async def build_async_pool(cls, redis_url: str = REDIS_URL) -> aioredis.ConnectionsPool:
-        redis_url = redis_url if redis_url.startswith('redis://') else f'redis://{redis_url}'
-        return await aioredis.create_redis_pool(address=redis_url)
 
     @contextmanager
     def wrapped_redis(self, op_name: str, use_pool: redis.ConnectionPool = None):

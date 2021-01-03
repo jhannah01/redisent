@@ -13,127 +13,96 @@ async def test_async_redis(fake_server):
     try:
         rh = RedisentHelper.build(r_pool, use_async=True)
 
-        await rh.set('blarg', 5.7)
-        assert await rh.exists('blarg'), 'Set key "blarg" but not found after setting.'
+        async with rh.wrapped_redis_async(op_name='set(blarg=5.7)') as r_conn:
+            res = await r_conn.set('blarg', 5.7)
+        assert res, f'Bad return from set(): {res}'
 
-        res = float(await rh.get('blarg', encoding=None))
+        async with rh.wrapped_redis_async(op_name='exists(blarg)') as r_conn:
+            res = await r_conn.exists('blarg')
+        assert res, f'Key "blarg" did not return True for exists(). Got: {res}'
+
+        async with rh.wrapped_redis_async(op_name='get(blarg)') as r_conn:
+            res = float(await r_conn.get('blarg'))
         assert res == 5.7, f'Fetched value of "blarg" does not match set value (5.7). Got: {res}'
 
-        print(f'Received matching object back\n{pformat(res, indent=4)}')
+        print(f'Received matching object back:\n{pformat(res, indent=4)}')
 
-        await rh.hset('beep', 'boop', 40.66)
-        assert await rh.hexists('beep', 'boop'), 'Cannot find hash key for "beep" -> "boop"'
+        op_name = 'hset("beep", "boop", ...) + hexists("beep", "boop") + hget("beep", "boop")'
+        async with rh.wrapped_redis_async(op_name=op_name) as r_conn:
+            res = await r_conn.hset('beep', 'boop', 40.66)
+            assert res, f'Bad retrun from hset(): {res}'
 
-        res = await rh.hget('beep', 'boop', use_return_type=float)
-        assert res == 40.66, f'Fetched value of "beep" -> "boop" does not match 40.66. Got: {res}'
+            res = await r_conn.hexists('beep', 'boop'),
+            assert res, 'Cannot find hash key for "beep" -> "boop" just created'
+
+            res = float(await r_conn.hget('beep', 'boop'))
+            assert res == 40.66, f'Fetched value of "beep" -> "boop" does not match 40.66. Got: {res}'
     finally:
-        r_pool.close()
-        await r_pool.wait_closed()
+        if r_pool:
+            r_pool.close()
+            await r_pool.wait_closed()
 
 
 def test_blocking_redis(redis):
     rh = RedisentHelper.build(redis, use_async=False)
 
-    rh.set('blarg', 5.7)
-    assert rh.exists('blarg'), 'Set key "blarg" but not found after setting.'
+    with rh.wrapped_redis(op_name='set(blarg=5.7)') as r_conn:
+        res = r_conn.set('blarg', 5.7)
+    assert res, f'Bad return from set(): {res}'
 
-    res = float(rh.get('blarg'))
+    with rh.wrapped_redis(op_name='exists(blarg)') as r_conn:
+        res = r_conn.exists('blarg')
+    assert res, 'Set key "blarg" but not found after setting.'
+
+    with rh.wrapped_redis(op_name='keys(*)') as r_conn:
+        res = [val.decode('utf-8') for val in r_conn.keys('*')]
+    assert res, 'No keys returned.'
+    assert 'blarg' in res, f'Could not find set key "blarg" in keys. Got: {res}'
+
+    with rh.wrapped_redis(op_name='get(blarg)') as r_conn:
+        res = float(r_conn.get('blarg'))
     assert res == 5.7, f'Fetched value of "blarg" does not match set value (5.7). Got: {res}'
 
     print(f'Received matching object back\n{pformat(res, indent=4)}')
 
+    with rh.wrapped_redis(op_name='delete(blarg)') as r_conn:
+        res = r_conn.delete('blarg')
+    assert res > 0, f'Bad return from delete(): {res}'
 
-def test_blocking_hash_redis(redis):
-    rh = RedisentHelper.build(redis, use_async=False)
+    print('All regular tests complete')
 
-    assert rh.hset('beep', 'boop', 40.66), 'Unable to set hash value in "beep" -> "boop"'
-    assert rh.hexists('beep', 'boop'), 'Cannot find hash key for "beep" -> "boop"'
+    with rh.wrapped_redis(op_name='hset(beep, boop, ...)') as r_conn:
+        res = r_conn.hset('beep', 'boop', 40.66)
+    assert res == 0, f'Bad return from hset(): {res}'
 
-    res = rh.hget('beep', 'boop', use_return_type=float)
-    assert res == 40.66, f'Fetched value of "beep" -> "boop" does not match 40.66. Got: {res}'
+    with rh.wrapped_redis(op_name='hexists(beep, boop)') as r_conn:
+        res = r_conn.hexists('beep', 'boop')
+    assert res, 'Set hash entry "boop" in key "beep" not found after setting.'
 
-    all_ents = rh.hgetall('beep')
+    with rh.wrapped_redis(op_name='hkeys(beep)') as r_conn:
+        res = [val.decode('utf-8') for val in r_conn.hkeys('beep')]
+    assert res, 'No hkeys returned for "beep".'
+    assert 'boop' in res, f'Could not find hash entry "boop" in key "beep". Got: {res}'
 
+    with rh.wrapped_redis(op_name='hget(beep, boop)') as r_conn:
+        res = float(r_conn.hget('beep', 'boop'))
+    assert res == 40.66, f'Fetched value of "boop" from key "beep" does not match set value (40.66). Got: {res}'
+
+    print(f'Received matching hash entry "boop" from key "beep" back\n{pformat(res, indent=4)}')
+
+    @rh.decode_entries(first_handler=lambda res: {k.decode('utf-8'): float(v) for k, v in res.items()})
+    def get_all():
+        with rh.wrapped_redis(op_name='hgetall(beep)') as r_conn:
+            return r_conn.hgetall('beep')
+
+    all_ents = get_all()
     assert 'boop' in all_ents, f'Missing "boop" entry in hgetall keys: "{all_ents.keys()}"'
+    assert all_ents == {'boop': 40.66}, f'Expected single dictionary entry in hgetall result. Got: {all_ents}'
 
     print(f'Received full hash entry for "beep":\n{pformat(all_ents, indent=4)}')
 
-'''
-@pytest.mark.asyncio
-async def test_async_helper__set_exists_keys_get_delete(fake_server):
-    r_pool = await fakeredis.aioredis.create_redis_pool(fake_server)
+    with rh.wrapped_redis(op_name='hdel(beep, boop)') as r_conn:
+        res = r_conn.hdel('beep', 'boop')
+    assert res > 0, f'Bad return from hdel(beep, boop): {res}'
 
-    try:
-        rh = RedisentHelper.build(r_pool, use_async=False)
-
-        await rh.set('blarg', 10)
-
-        redis_keys = await rh.keys('*')
-
-        assert 'blarg' in redis_keys, f'Cannot find expected key "blarg". All keys: {redis_keys}'
-
-        res = await rh.get('blarg')
-
-        assert res == 10, f'Fetched value just set is not 10. Value: {res}'
-
-        print(f'Successfully fetched "blarg" back with value "{res}"')
-
-        assert await rh.delete('blarg'), f'Failed to delete new key "blarg"'
-    finally:
-        r_pool.close()
-        await r_pool.wait_closed()
-'''
-'''
-@pytest.mark.asyncio
-async def test_redishelper__hset_hexists_hkeys_hget_hgetall_hdelete(fake_server):
-    r_conn = await fakeredis.aioredis.create_redis_pool(fake_server)
-
-    try:
-        rh = RedisHelper(r_conn)
-
-        await rh.hset('blarg', 'value', {'test': 10}, encode_value=True, pool=r_conn)
-
-        assert await rh.hexists('blarg', 'value', pool=r_conn), f'Newly set hash "blarg" -> "value" fails hexists'
-
-        redis_keys = await rh.hkeys('blarg', pool=r_conn)
-
-        assert 'value' in redis_keys, f'Cannot find expected key "blarg". All keys: {redis_keys}'
-
-        res = await rh.hget('blarg', 'value', pool=r_conn)
-
-        assert res['test'] == 10, f'Fetched value of "blarg" -> "value" was not 10. Value: {res}'
-
-        print(f'Successfully fetched "blarg" back with value "{res}"')
-
-        all_ents = await rh.hgetall('blarg', pool=r_conn)
-
-        assert 'value' in all_ents, f'Cannot find entry in hash key "blarg" for "value" using hgetall. Keys: "{all_ents}"'
-
-        assert all_ents['value'] == {'test': 10}, f'Invalid value found for entry "value" in hash key "blarg". Should be 10, All fetched entries: "{all_ents["value"]}"'
-
-        assert await rh.hdelete('blarg', 'value', pool=r_conn), f'Failed to delete new entry "value" in key "blarg"'
-    finally:
-        if r_conn:
-            r_conn.close()
-            await r_conn.wait_closed()
-
-
-@pytest.mark.asyncio
-async def test_redishelper__get_bad_entry(fake_server):
-    r_conn = await fakeredis.aioredis.create_redis_pool(fake_server)
-
-    try:
-        rh = RedisHelper(r_conn)
-
-        with pytest.raises(RedisError) as exc_info:
-            res = await rh.get('fake_blah', missing_okay=False, pool=r_conn)
-
-        assert 'Does not exist' in str(exc_info), f'Expected to receive exception when fetching bad redis key using missing_okay=False. Got instead: {exc_info}'
-
-        assert await rh.get('fake_blah', missing_okay=True, pool=r_conn) is None, 'Excepted exception to be raised fetching bad Redis entry using missing_okay=True'
-    finally:
-        if r_conn:
-            r_conn.close()
-            await r_conn.wait_closed()
-
-'''
+    print('All hash tests complete')

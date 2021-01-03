@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import pickle
 
 from dataclasses import is_dataclass, dataclass, field, fields, asdict
 from typing import Mapping, Any, List, Optional, Union
 
-from redisent.helpers import BlockingRedisentHelper, AsyncRedisentHelper
+import redis
+
+from redisent.helpers import RedisentHelper
 from redisent import RedisError
 
 logger = logging.getLogger(__name__)
@@ -47,9 +50,6 @@ class RedisEntry:
 
         return flds
 
-    def __init__(self, *args, **kwargs) -> None:
-        pass
-
     @property
     def entry_fields(self) -> List[str]:
         return self.get_entry_fields(include_redis_fields=False, include_internal_fields=False)
@@ -89,12 +89,21 @@ class RedisEntry:
         return {attr: value for attr, value in ent_dict.items() if attr in flds}
 
     @classmethod
-    def decode_entry(cls, entry_bytes) -> RedisEntry:
+    def decode_entry(cls, entry_bytes, use_redis_id: str = None, use_redis_name: str = None) -> RedisEntry:
         try:
             ent = pickle.loads(entry_bytes)
 
             if isinstance(ent, Mapping):
-                return cls.from_dict(**ent)
+                redis_id = ent.pop('redis_id', None)
+                redis_id = use_redis_id or redis_id
+
+                if not redis_id:
+                    raise RedisError('Unable to convert dictionary from Redis into RedisEntry (no value for "redis_id" found)')
+
+                redis_name = ent.pop('redis_name', None)
+                redis_name = use_redis_name or redis_name
+
+                return cls.from_dict(redis_id, redis_name=redis_name, **ent)
             elif not isinstance(ent, RedisEntry):
                 raise RedisError('Decoded entry is neither a dictionary nor a Mapping')
 
@@ -116,29 +125,53 @@ class RedisEntry:
             raise Exception(f'Error encoding entry for "{entry.redis_id}"{ent_str} using pickle: {ex}')
 
     @classmethod
-    def fetch(cls, helper: BlockingRedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
-        entry_bytes = helper.hget(redis_id, redis_name, return_bytes=True) if redis_name else helper.get(redis_id)
+    def fetch(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
+        op_name = f'get(key="{redis_id}")' if not redis_name else f'hget(key="{redis_id}", name="{redis_name}")'
+        name_str = f' of entry "{redis_name}"' if redis_name else ''
+
+        if helper.use_async:
+            raise ValueError(f'Cannot use async fetch helper for blocking fetch request of "{redis_id}"{name_str}')
+
+        with helper.wrapped_redis(op_name=op_name) as r_conn:
+            entry_bytes = r_conn.get(redis_id) if not redis_name else r_conn.hget(redis_id, redis_name)
+
         if not entry_bytes:
-            name_str = f' of entry "{redis_name}"' if redis_name else ''
             raise RedisError(f'Failure during fetch of key "{redis_id}"{name_str}: No data returned')
 
         return cls.decode_entry(entry_bytes)
 
     @classmethod
-    async def async_fetch(cls, helper: AsyncRedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
-        entry_bytes = await (helper.hget(redis_id, redis_name) if redis_name else helper.get(redis_id))
+    async def fetch_async(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
+        op_name = f'get(key="{redis_id}")' if not redis_name else f'hget(key="{redis_id}", name="{redis_name}")'
+        name_str = f' of entry "{redis_name}"' if redis_name else ''
+
+        if not helper.use_async:
+            raise ValueError(f'Cannot use blocking fetch helper for async fetch request of "{redis_id}"{name_str}')
+
+        async with helper.wrapped_redis_async(op_name=op_name) as r_conn:
+            coro = r_conn.get(redis_id, encoding=None) if not redis_name else r_conn.hget(redis_id, redis_name, encoding=None)
+            entry_bytes = await coro
+
         if not entry_bytes:
-            name_str = f' of entry "{redis_name}"' if redis_name else ''
-            raise RedisError(f'Failure during async fetch of key "{redis_id}"{name_str}: No data returned')
+            raise RedisError(f'Failure during fetch of key "{redis_id}"{name_str}: No data returned')
+
         return cls.decode_entry(entry_bytes)
 
-    def store(self, helper: BlockingRedisentHelper) -> bool:
+    def store(self, helper: RedisentHelper) -> bool:
         entry_bytes = self.encode_entry(self)
-        return helper.hset(self.redis_id, self.redis_name, entry_bytes) if self.redis_name else helper.set(self.redis_id, entry_bytes)
+        op_name = f'set(key="{self.redis_id}")' if not self.redis_name else f'hset(key="{self.redis_id}", name="{self.redis_name}")'
 
-    async def async_store(self, helper: AsyncRedisentHelper) -> bool:
-        entry_bytes = self.encode_entry(self)
-        if self.redis_name:
-            return await helper.hset(self.redis_id, self.redis_name, entry_bytes)
+        if not helper.use_async:
+            with helper.wrapped_redis(op_name=op_name) as r_conn:
+                return r_conn.set(self.redis_id, entry_bytes) if not self.redis_name else r_conn.hset(self.redis_id, self.redis_name, entry_bytes)
+        else:
+            async def store_async():
+                async with helper.wrapped_redis_async(op_name=op_name) as r_conn_async:
+                    if self.redis_name:
+                        res = await r_conn_async.hset(self.redis_id, self.redis_name, entry_bytes)
+                    else:
+                        res = await r_conn_async.set(self.redis_id, entry_bytes)
 
-        return await helper.set(self.redis_id, entry_bytes)
+                    return res
+
+            return helper.async_loop.run_until_complete(store_async())
