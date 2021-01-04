@@ -11,5 +11,8 @@ setuptools.setup(
     author='Jon Hannah',
     author_email='jon@synistree.com',
     description='Async-enabled Redis serialization library',
-    include_package_data=True
+    include_package_data=True,
+    package_data={
+        'redisent': ['py.typed']
+    }
 )

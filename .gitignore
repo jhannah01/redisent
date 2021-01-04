@@ -16,3 +16,4 @@ ipy/.ipynb_checkpoints
 /.coverage
 /.tox/
 /report/
+/docs/build

@@ -11,7 +11,7 @@ async def test_async_redis(fake_server):
     r_pool = await fakeredis.aioredis.create_redis_pool(fake_server)
 
     try:
-        rh = RedisentHelper.build(r_pool, use_async=True)
+        rh = RedisentHelper(redis_pool=r_pool, use_async=True)
 
         async with rh.wrapped_redis_async(op_name='set(blarg=5.7)') as r_conn:
             res = await r_conn.set('blarg', 5.7)
@@ -44,7 +44,7 @@ async def test_async_redis(fake_server):
 
 
 def test_blocking_redis(redis):
-    rh = RedisentHelper.build(redis, use_async=False)
+    rh = RedisentHelper(redis_pool=redis, use_async=False)
 
     with rh.wrapped_redis(op_name='set(blarg=5.7)') as r_conn:
         res = r_conn.set('blarg', 5.7)

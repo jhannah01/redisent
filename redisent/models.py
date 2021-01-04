@@ -10,7 +10,7 @@ from typing import Mapping, Any, List, Optional, Union
 import redis
 
 from redisent.helpers import RedisentHelper
-from redisent import RedisError
+from redisent.errors import RedisError
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class RedisEntry:
         return {attr: value for attr, value in ent_dict.items() if attr in flds}
 
     @classmethod
-    def decode_entry(cls, entry_bytes, use_redis_id: str = None, use_redis_name: str = None) -> RedisEntry:
+    def decode_entry(cls, entry_bytes, use_redis_id: str = None, use_redis_name: str = None):
         try:
             ent = pickle.loads(entry_bytes)
 

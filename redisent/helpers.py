@@ -23,14 +23,26 @@ class RedisentHelper:
     use_async: bool = False
     _loop: asyncio.AbstractEventLoop
 
-    def __init__(self, redis_pool: RedisPoolType, use_async: bool = False) -> None:
-        self.redis_pool = redis_pool
+    def __init__(self, redis_pool: RedisPoolType = None, use_async: bool = False, redis_url: str = None) -> None:
+        redis_url = redis_url or REDIS_URL
+        redis_url = f'redis://{redis_url}' if not redis_url.startswith('redis://') else redis_url
         self.use_async = use_async
 
         if not use_async:
+            self.redis_pool = redis_pool or redis.ConnectionPool.from_url(redis_url)
             return
 
         self._loop = self.get_event_loop()
+        if not redis_pool:
+            redis_pool = self._loop.run_until_complete(aioredis.create_redis_pool(redis_url))
+
+        self.redis_pool = redis_pool
+
+    def __del__(self):
+        if self.use_async:
+            logger.debug('Cleaning up async Redis pool')
+            self.redis_pool.close()
+            self.async_loop.run_until_complete(self.redis_pool.wait_closed())
 
     @staticmethod
     def get_event_loop() -> asyncio.AbstractEventLoop:
@@ -57,12 +69,6 @@ class RedisentHelper:
         self.redis_pool.close()
         self._loop.run_until_complete(self.redis_pool.wait_closed())
         return True
-
-    '''
-    def __del__(self):
-        self.cleanup()
-        logger.debug('Finished closing async Redis pool after deletion')
-    '''
 
     def decode_entries(self, use_encoding: str = None, first_handler: Callable = None, final_handler: Callable = None):
         def _outer_wrapper(func):
@@ -108,21 +114,10 @@ class RedisentHelper:
 
         return res
 
-    @classmethod
-    def build(cls, redis_pool: Union[RedisPoolType, str], use_async: bool = False) -> RedisentHelper:
-        if isinstance(redis_pool, str):
-            redis_uri = redis_pool if redis_pool.startswith('redis://') else f'redis://{redis_pool}'
-
-            if use_async:
-                loop = asyncio.get_event_loop()
-                redis_pool = loop.run_until_complete(aioredis.create_redis_pool(redis_uri))
-            else:
-                redis_pool = redis.ConnectionPool.from_url(redis_uri)
-
-        return cls(redis_pool, use_async)
+    wrapped_redis = property(fget=lambda self: self.wrapped_redis_blocking if not self.use_async else self.wrapped_redis_async)
 
     @contextmanager
-    def wrapped_redis(self, op_name: str, use_pool: redis.ConnectionPool = None):
+    def wrapped_redis_blocking(self, op_name: str, use_pool: redis.ConnectionPool = None):
         pool = use_pool or self.redis_pool
         try:
             r_conn = redis.Redis(connection_pool=pool)
