@@ -13,7 +13,7 @@ async def test_async_redis(fake_server):
     try:
         rh = RedisentHelper(redis_pool=r_pool, use_async=True)
 
-        async with rh.wrapped_redis_async(op_name='set(blarg=5.7)') as r_conn:
+        async with rh.wrapped_redis_async(op_name='set(blarg, 5.7)') as r_conn:
             res = await r_conn.set('blarg', 5.7)
         assert res, f'Bad return from set(): {res}'
 
@@ -27,16 +27,26 @@ async def test_async_redis(fake_server):
 
         print(f'Received matching object back:\n{pformat(res, indent=4)}')
 
-        op_name = 'hset("beep", "boop", ...) + hexists("beep", "boop") + hget("beep", "boop")'
-        async with rh.wrapped_redis_async(op_name=op_name) as r_conn:
-            res = await r_conn.hset('beep', 'boop', 40.66)
-            assert res, f'Bad retrun from hset(): {res}'
+        async with rh.wrapped_redis_async(op_name='delete(blarg)') as r_conn:
+            res = await r_conn.delete('blarg')
+            assert res > 0, f'Bad return from delete(blarg): {res}'
 
+        async with rh.wrapped_redis_async(op_name='hset("beep", "boop", ...)') as r_conn:
+            res = await r_conn.hset('beep', 'boop', 40.66)
+            assert res, f'Bad return from hset(beep, boop, ...): {res}'
+
+        async with rh.wrapped_redis_async(op_name='hexists("beep", "boop")') as r_conn:
             res = await r_conn.hexists('beep', 'boop'),
             assert res, 'Cannot find hash key for "beep" -> "boop" just created'
 
+        async with rh.wrapped_redis_async(op_name='hget("beep", "boop")') as r_conn:
             res = float(await r_conn.hget('beep', 'boop'))
             assert res == 40.66, f'Fetched value of "beep" -> "boop" does not match 40.66. Got: {res}'
+
+        async with rh.wrapped_redis(op_name='hdel(beep, boop)') as r_conn:
+            res = await r_conn.hdel('beep', 'boop')
+            assert res > 0, f'Bad return from hdel(beep, boop): {res}'
+
     finally:
         if r_pool:
             r_pool.close()
@@ -73,7 +83,7 @@ def test_blocking_redis(redis):
 
     with rh.wrapped_redis(op_name='hset(beep, boop, ...)') as r_conn:
         res = r_conn.hset('beep', 'boop', 40.66)
-    assert res == 0, f'Bad return from hset(): {res}'
+        assert res, f'Bad return from hset(beep, boop, ...): {res}'
 
     with rh.wrapped_redis(op_name='hexists(beep, boop)') as r_conn:
         res = r_conn.hexists('beep', 'boop')

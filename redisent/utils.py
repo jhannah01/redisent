@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import aioredis
 import redis
 import dateparser
 import logging
+import functools
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Union, Optional, Any, Mapping, Dict
@@ -64,3 +67,44 @@ class FuzzyTime:
     @classmethod
     def from_dict(cls, dict_mapping: Mapping[str, Any]) -> FuzzyTime:
         return FuzzyTime(provided_when=dict_mapping['provided_when'], created_time=dict_mapping.get('created_time', None))
+
+
+def force_async(fn):
+    pool = ThreadPoolExecutor()
+    try:
+        @functools.wraps(fn)
+        def _wrapper(*args, **kwargs):
+            future = pool.submit(fn, *args, **kwargs)
+            return asyncio.wrap_future(future)
+
+        return _wrapper
+    except Exception as ex:
+        logger.exception(f'Error calling force_async wrapped function: {ex}')
+    finally:
+        if pool:
+            pool.shutdown()
+
+
+def force_sync(loop=None):
+    loop = loop or asyncio.get_event_loop()
+
+    if not loop:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    def _inner(fn):
+        if not asyncio.iscoroutine(fn) and not asyncio.iscoroutinefunction(fn):
+            raise TypeError(f'Cannot force decorated function "{fn.__name__}" to run async. It is not a coroutine.')
+
+        @functools.wraps(fn)
+        def _wrapper(*args, **kwargs):
+            res = fn(*args, **kwargs)
+
+            if asyncio.iscoroutine(res):
+                return loop.run_until_complete(res)
+
+            return res
+
+        return _wrapper
+
+    return _inner

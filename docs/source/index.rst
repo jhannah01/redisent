@@ -6,8 +6,9 @@ Documentation for the redisent Python library
    :caption: Contents:
    :glob:
 
-   pages/**
-
+   Introduction <pages/intro>
+   Basic Example <pages/example>
+   pages/api/**
 
 
 Indices and tables

@@ -42,13 +42,12 @@ class RedisentHelper:
         if self.use_async:
             logger.debug('Cleaning up async Redis pool')
             self.redis_pool.close()
-            self.async_loop.run_until_complete(self.redis_pool.wait_closed())
 
     @staticmethod
     def get_event_loop() -> asyncio.AbstractEventLoop:
         _loop = asyncio.get_event_loop()
 
-        if _loop:
+        if not _loop:
             logger.debug(f'Creating new event loop (cannot find running one)')
             _loop = asyncio.new_event_loop()
             asyncio.set_event_loop(_loop)

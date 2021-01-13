@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import pickle
 
 from dataclasses import is_dataclass, dataclass, field, fields, asdict
-from typing import Mapping, Any, List, Optional, Union
-
-import redis
+from typing import Mapping, Any, List, Optional
 
 from redisent.helpers import RedisentHelper
 from redisent.errors import RedisError
+from redisent.utils import force_async
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +123,7 @@ class RedisEntry:
             raise Exception(f'Error encoding entry for "{entry.redis_id}"{ent_str} using pickle: {ex}')
 
     @classmethod
-    def fetch(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
+    def fetch_blocking(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
         op_name = f'get(key="{redis_id}")' if not redis_name else f'hget(key="{redis_id}", name="{redis_name}")'
         name_str = f' of entry "{redis_name}"' if redis_name else ''
 
@@ -157,21 +155,30 @@ class RedisEntry:
 
         return cls.decode_entry(entry_bytes)
 
-    def store(self, helper: RedisentHelper) -> bool:
+    @force_async
+    async def store(self, helper: RedisentHelper) -> bool:
+        if not helper.use_async:
+            raise RedisError('Attempted to call (async) store_async method with non-async helper')
+
         entry_bytes = self.encode_entry(self)
         op_name = f'set(key="{self.redis_id}")' if not self.redis_name else f'hset(key="{self.redis_id}", name="{self.redis_name}")'
 
-        if not helper.use_async:
-            with helper.wrapped_redis(op_name=op_name) as r_conn:
-                return r_conn.set(self.redis_id, entry_bytes) if not self.redis_name else r_conn.hset(self.redis_id, self.redis_name, entry_bytes)
-        else:
-            async def store_async():
-                async with helper.wrapped_redis_async(op_name=op_name) as r_conn_async:
-                    if self.redis_name:
-                        res = await r_conn_async.hset(self.redis_id, self.redis_name, entry_bytes)
-                    else:
-                        res = await r_conn_async.set(self.redis_id, entry_bytes)
+        async with helper.wrapped_redis_async(op_name=op_name) as r_conn:
+            if self.redis_name:
+                return await r_conn.hset(self.redis_id, self.redis_name, entry_bytes)
 
-                    return res
+            return await r_conn.set(self.redis_id, entry_bytes)
 
-            return helper.async_loop.run_until_complete(store_async())
+    def store_blocking(self, helper: RedisentHelper) -> bool:
+        if helper.use_async:
+            raise RedisError('Attempted to call (blocking) store method with async helper')
+
+        entry_bytes = self.encode_entry(self)
+        op_name = f'set(key="{self.redis_id}")' if not self.redis_name else f'hset(key="{self.redis_id}", name="{self.redis_name}")'
+
+        with helper.wrapped_redis(op_name=op_name) as r_conn:
+            if not self.redis_name:
+                return r_conn.set(self.redis_id, entry_bytes)
+
+            return r_conn.hset(self.redis_id, self.redis_name, entry_bytes)
+
