@@ -123,7 +123,7 @@ class RedisEntry:
             raise Exception(f'Error encoding entry for "{entry.redis_id}"{ent_str} using pickle: {ex}')
 
     @classmethod
-    def fetch_blocking(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
+    def fetch(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
         op_name = f'get(key="{redis_id}")' if not redis_name else f'hget(key="{redis_id}", name="{redis_name}")'
         name_str = f' of entry "{redis_name}"' if redis_name else ''
 
@@ -156,7 +156,7 @@ class RedisEntry:
         return cls.decode_entry(entry_bytes)
 
     @force_async
-    async def store(self, helper: RedisentHelper) -> bool:
+    async def store_async(self, helper: RedisentHelper) -> bool:
         if not helper.use_async:
             raise RedisError('Attempted to call (async) store_async method with non-async helper')
 
@@ -169,7 +169,7 @@ class RedisEntry:
 
             return await r_conn.set(self.redis_id, entry_bytes)
 
-    def store_blocking(self, helper: RedisentHelper) -> bool:
+    def store(self, helper: RedisentHelper) -> bool:
         if helper.use_async:
             raise RedisError('Attempted to call (blocking) store method with async helper')
 

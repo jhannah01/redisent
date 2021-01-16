@@ -106,3 +106,26 @@ Finally, we can fetch back the original reminder from Redis using :py:meth:`redi
    Out[17]: True
 
 Et voila! An equivilent instance of the newly created instance of ``Reminder``, ``rem`` was fetched and de-serialized as ``rem_fetched``.
+
+Wrapping Up
+-----------
+The astute reader will notice the requirement for providing ``redis_id`` with a static value ("reminders" in this case). If a ``RedisEntry`` subclass should always use a specific key, it is often easier to re-define the ``redis_id`` dataclass :py:func:`dataclasses.field`.
+
+Here is what it would look like in the case of the ``Reminder`` class:
+
+.. code-block:: python
+   :linenos:
+   :emphasize-lines: 9,10
+
+   @dataclass
+   class Reminder(RedisEntry):
+       member_id: str = field(default_factory=str)
+       member_name: str = field(default_factory=str)
+
+       channel_id: str = field(default_factory=str)
+       channel_name: str = field(default_factory=str)
+
+       # Force "redis_id" to be "reminders"
+       redis_id: str = field(default='reminders', metadata={'redis_field': True})
+
+
