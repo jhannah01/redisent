@@ -63,7 +63,7 @@ class RedisEntry:
         return super().__new__(cls)
 
     @classmethod
-    def from_dict(cls, redis_id: str, redis_name: str = None, **ent_kwargs) -> RedisEntry:
+    def load_dict(cls, redis_id: str, redis_name: str = None, **ent_kwargs):
         if not redis_name:
             if 'redis_name' in ent_kwargs:
                 redis_name = ent_kwargs.pop('redis_name')
@@ -101,7 +101,7 @@ class RedisEntry:
                 redis_name = ent.pop('redis_name', None)
                 redis_name = use_redis_name or redis_name
 
-                return cls.from_dict(redis_id, redis_name=redis_name, **ent)
+                return cls.load_dict(redis_id, redis_name=redis_name, **ent)
             elif not isinstance(ent, RedisEntry):
                 raise RedisError('Decoded entry is neither a dictionary nor a Mapping')
 
@@ -123,7 +123,7 @@ class RedisEntry:
             raise Exception(f'Error encoding entry for "{entry.redis_id}"{ent_str} using pickle: {ex}')
 
     @classmethod
-    def fetch(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
+    def fetch(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None):
         op_name = f'get(key="{redis_id}")' if not redis_name else f'hget(key="{redis_id}", name="{redis_name}")'
         name_str = f' of entry "{redis_name}"' if redis_name else ''
 
@@ -139,7 +139,7 @@ class RedisEntry:
         return cls.decode_entry(entry_bytes)
 
     @classmethod
-    async def fetch_async(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
+    async def fetch_async(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None):
         op_name = f'get(key="{redis_id}")' if not redis_name else f'hget(key="{redis_id}", name="{redis_name}")'
         name_str = f' of entry "{redis_name}"' if redis_name else ''
 
