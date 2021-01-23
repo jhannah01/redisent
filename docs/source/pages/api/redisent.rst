@@ -18,7 +18,7 @@ redisent.helpers module
 .. automodule:: redisent.helpers
    :members:
    :undoc-members:
-   :show-inheritance:
+   :private-members:
 
 redisent.models module
 ----------------------
@@ -26,7 +26,7 @@ redisent.models module
 .. automodule:: redisent.models
    :members:
    :undoc-members:
-   :show-inheritance:
+   :private-members:
 
 redisent.utils module
 ---------------------
@@ -34,7 +34,7 @@ redisent.utils module
 .. automodule:: redisent.utils
    :members:
    :undoc-members:
-   :show-inheritance:
+   :private-members:
 
 Module contents
 ---------------
