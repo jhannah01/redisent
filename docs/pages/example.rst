@@ -5,7 +5,7 @@ This portion of the documentation covers a rather basic but illustrative example
 
 Here is a rather straight forward example of a ``Reminder`` Redis hash entry which stores a few basic attributes with it:
 
-.. literalinclude:: ../../../examples/reminder.py
+.. literalinclude:: ../../examples/reminder.py
    :language: python
    :linenos:
 

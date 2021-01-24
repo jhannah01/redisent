@@ -90,17 +90,49 @@ class RedisentHelper:
 
         self.use_async = use_async
 
+    @staticmethod
+    def _handle_decode_attempt(res, use_encoding: str = None, decode_handler: Callable = None):
+        """
+        Internal handler for attempting to intelligently decode any discovered :py:class:`redisent.models.RedisEntry` instances found
+
+        :param use_encoding: if provided, indicates the results should be decoded using the provided encoding (generally ``utf-8``)
+        :param first_handler: optional callback that will be called when attempting to decode response
+        """
+
+        if not res:
+            return res
+
+        def decode_value(value):
+            try:
+                return pickle.loads(value)
+            except pickle.PickleError:
+                if decode_handler:
+                    return decode_handler(value)
+                elif use_encoding:
+                    return value.decode(use_encoding)
+
+                return value
+
+        if isinstance(res, list):
+            res = [decode_value(ent) for ent in res]
+        elif isinstance(res, dict):
+            res = {ent_name.decode(use_encoding) if use_encoding else ent_name: decode_value(ent_value) for ent_name, ent_value in res.items()}
+        elif use_encoding:
+            res = res.decode(use_encoding)
+
+        return res
+
     def decode_entries(self, use_encoding: str = None, first_handler: Callable = None, final_handler: Callable = None):
         """
-        Decorator used for automatically attempting to decode the returned value of a method using :py:meth:`RedisentHelper._handle_decode_attempt`
+        Decorator used for automatically attempting to decode the returned value of a method using the static method ``_handle_decode_attempt``
 
-        This is helpful for automatically returning :py:cls:`RedisEntry` instances and / or the opportunity to interact with the results via the
+        This is helpful for automatically returning :py:class:`redisent.models.RedisEntry` instances and / or the opportunity to interact with the results via the
         two ``Callable`` arguments ``first_handler`` and ``final_handler``.
 
-        If provided, the ``first_handler`` is used first, prior to attempting to use :py:meth:`RedisentHelper._handle_decode_attempt`. Finally, if provided,
+        If provided, the ``first_handler`` is used first, prior to attempting to using the ``_handle_decode_attempt`` static method. Finally, if provided,
         the ``final_handler`` will be called prior to passing the possibly decoded response back to the caller.
 
-        This decorator can be used with ``asyncio`` coroutine or regular methods. The inner decorator uses :py:meth:`asyncio.iscoroutinefunction` to determine if
+        This decorator can be used with ``asyncio`` coroutine or regular methods. The inner decorator uses :py:func:`asyncio.iscoroutinefunction` to determine if
         the wrapped method is a a coroutine and calls the handlers accordingly.
 
         :param use_encoding: if provided, indicates the results should be decoded using the provided encoding (generally ``utf-8``)
@@ -125,31 +157,6 @@ class RedisentHelper:
                 return _blocking_wrapper
 
         return _outer_wrapper
-
-    @staticmethod
-    def _handle_decode_attempt(res, use_encoding: str = None, decode_handler: Callable = None):
-        if not res:
-            return res
-
-        def decode_value(value):
-            try:
-                return pickle.loads(value)
-            except pickle.PickleError:
-                if decode_handler:
-                    return decode_handler(value)
-                elif use_encoding:
-                    return value.decode(use_encoding)
-
-                return value
-
-        if isinstance(res, list):
-            res = [decode_value(ent) for ent in res]
-        elif isinstance(res, dict):
-            res = {ent_name.decode(use_encoding) if use_encoding else ent_name: decode_value(ent_value) for ent_name, ent_value in res.items()}
-        elif use_encoding:
-            res = res.decode(use_encoding)
-
-        return res
 
     wrapped_redis = property(fget=lambda self: self._wrapped_redis_blocking if not self.use_async else self._wrapped_redis_async)
 

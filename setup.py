@@ -10,7 +10,7 @@ setuptools.setup(
     license='',
     author='Jon Hannah',
     author_email='jon@synistree.com',
-    description='Async-enabled Redis serialization library',
+    description='Python library for serialization / de-serialization of dataclasses in Redis',
     include_package_data=True,
     package_data={
         'redisent': ['py.typed']
