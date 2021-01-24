@@ -4,7 +4,7 @@ import logging
 import pickle
 
 from dataclasses import is_dataclass, dataclass, field, fields, asdict
-from typing import Mapping, Any, List, Optional
+from typing import Mapping, Any, List, Optional, MutableMapping
 
 from redisent.helpers import RedisentHelper
 from redisent.errors import RedisError
@@ -89,7 +89,7 @@ class RedisEntry:
     @classmethod
     def decode_entry(cls, entry_bytes, use_redis_id: str = None, use_redis_name: str = None):
         try:
-            ent = pickle.loads(entry_bytes)
+            ent: MutableMapping[str, Any] = pickle.loads(entry_bytes)
 
             if isinstance(ent, Mapping):
                 redis_id = ent.pop('redis_id', None)
@@ -146,7 +146,7 @@ class RedisEntry:
         if not helper.use_async:
             raise ValueError(f'Cannot use blocking fetch helper for async fetch request of "{redis_id}"{name_str}')
 
-        async with helper.wrapped_redis_async(op_name=op_name) as r_conn:
+        async with helper.wrapped_redis(op_name=op_name) as r_conn:
             coro = r_conn.get(redis_id, encoding=None) if not redis_name else r_conn.hget(redis_id, redis_name, encoding=None)
             entry_bytes = await coro
 
@@ -163,7 +163,7 @@ class RedisEntry:
         entry_bytes = self.encode_entry(self)
         op_name = f'set(key="{self.redis_id}")' if not self.redis_name else f'hset(key="{self.redis_id}", name="{self.redis_name}")'
 
-        async with helper.wrapped_redis_async(op_name=op_name) as r_conn:
+        async with helper.wrapped_redis(op_name=op_name) as r_conn:
             if self.redis_name:
                 return await r_conn.hset(self.redis_id, self.redis_name, entry_bytes)
 

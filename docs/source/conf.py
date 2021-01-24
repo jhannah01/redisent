@@ -41,6 +41,14 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 
+autoclass_content = 'both'
+autodoc_default_options = {
+        'members': True,
+        'member-order': 'bysource',
+        'special-members': '__init__',
+        'undoc-members': True,
+        'exclude-members': '__weakref__'
+}
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -87,5 +95,6 @@ def setup(app):
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
-    'aioredis': ('https://aioredis.readthedocs.io/en/latest/', None)
+    'aioredis': ('https://aioredis.readthedocs.io/en/latest/', None),
+    'redis': ('https://redis-py.readthedocs.io/en/stable/', None),
 }

@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 RedisPoolType = Union[aioredis.ConnectionsPool, redis.ConnectionPool]
 RedisPrimitiveType = Union[int, float, str, bytes]
 
-REDIS_URL: str = 'redis://rpi04.synistree.com'
 LOG_LEVEL: int = logging.INFO
 
 
