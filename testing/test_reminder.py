@@ -30,7 +30,7 @@ async def test_async_store_reminder(fake_server):
     rem = build_reminder()
 
     try:
-        rh = RedisentHelper(redis_pool=r_pool, use_async=True)
+        rh = await RedisentHelper.build_async(redis_pool=r_pool)
 
         async with rh.wrapped_redis(op_name=f'hexists("reminders", "{rem.redis_name}")') as r_conn:
             res = await r_conn.hexists('reminders', rem.redis_name)
@@ -53,8 +53,8 @@ async def test_async_store_reminder(fake_server):
             await r_pool.wait_closed()
 
 
-def test_blocking_store_reminder(redis):
-    rh = RedisentHelper(redis_pool=redis, use_async=False)
+def test_blocking_store_reminder(fake_server):
+    rh = RedisentHelper.build(redis_pool=fake_server)
     rem = build_reminder()
 
     with rh.wrapped_redis(op_name=f'hexists("reminders", "{rem.redis_name}")') as r_conn:

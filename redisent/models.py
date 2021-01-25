@@ -8,7 +8,6 @@ from typing import Mapping, Any, List, Optional, MutableMapping
 
 from redisent.helpers import RedisentHelper
 from redisent.errors import RedisError
-from redisent.utils import force_async
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +154,6 @@ class RedisEntry:
 
         return cls.decode_entry(entry_bytes)
 
-    @force_async
     async def store_async(self, helper: RedisentHelper) -> bool:
         if not helper.use_async:
             raise RedisError('Attempted to call (async) store_async method with non-async helper')

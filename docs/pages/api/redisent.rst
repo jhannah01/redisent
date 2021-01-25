@@ -4,6 +4,14 @@ redisent package
 Submodules
 ----------
 
+redisent.connection module
+--------------------------
+
+.. automodule:: redisent.connection
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 redisent.errors module
 ----------------------
 

@@ -1,1 +1,1 @@
-../examples/reminder.py
+../docs/examples/reminder.py
