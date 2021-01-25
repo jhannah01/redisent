@@ -64,7 +64,9 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_static_path = ['_static']
 pygments_style = 'monokai'
 
-nitpick_classes = ['redis.ConnectionPool', 'redis.connection.ConnectionPool', 'aioredis.pool.ConnectionsPool', 'asyncio.events.AbstractEventLoop', 'datetime']
+nitpick_classes = ['redis.ConnectionPool', 'redis.connection.ConnectionPool',
+                   'aioredis.pool.ConnectionsPool', 'datetime',
+                   'asyncio.events.AbstractEventLoop']
 
 nitpicky = True
 nitpick_ignore = []
@@ -78,8 +80,6 @@ source_suffix = {
     '.rst': 'restructuredtext',
     '.md': 'markdown',
 }
-
-source_suffix = ['.rst', '.md']
 
 
 def setup(app):

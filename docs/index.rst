@@ -6,6 +6,7 @@ Documentation for the redisent Python library
    :caption: Contents:
    :glob:
 
+   README <pages/README>
    Introduction <pages/intro>
    Basic Example <pages/example>
    Usage with asyncio <pages/async>
