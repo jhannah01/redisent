@@ -64,16 +64,16 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_static_path = ['_static']
 pygments_style = 'monokai'
 
-nitpick_classes = ['redis.ConnectionPool', 'redis.connection.ConnectionPool',
-                   'aioredis.pool.ConnectionsPool', 'datetime',
-                   'asyncio.events.AbstractEventLoop']
+nitpick_classes = ['redis.ConnectionPool', 'redis.connection.ConnectionPool', 'datetime',
+                   'aioredis.pool.ConnectionsPool', 'asyncio.events.AbstractEventLoop']
 
 nitpicky = True
 nitpick_ignore = []
 
 for cls_name in nitpick_classes:
     nitpick_ignore.append(('py:class', cls_name))
-autodoc_mock_imports = ['redis', 'aioredis', 'asyncio', 'datetime']
+
+autodoc_mock_imports = ['redis', 'aioredis', 'asyncio']
 
 # -- Extension configuration -------------------------------------------------
 source_suffix = {
