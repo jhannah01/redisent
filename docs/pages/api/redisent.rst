@@ -34,7 +34,6 @@ redisent.utils module
 .. automodule:: redisent.utils
    :members:
    :undoc-members:
-   :private-members:
 
 Module contents
 ---------------
