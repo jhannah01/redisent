@@ -26,4 +26,4 @@ def setup_logger(log_level: int = logging.DEBUG, squelch: bool = False):
 
 setup_logger(log_level=LOG_LEVEL, squelch=TYPE_CHECKING)
 
-__all__ = ['RedisError', 'RedisentHelper', 'RedisEntry']
+__all__ = ['RedisError', 'RedisentHelper', 'RedisEntry', 'setup_logger']
