@@ -1,6 +1,7 @@
 from recommonmark.transform import AutoStructify
 
 import os
+import builtins
 import sys
 import sphinx_rtd_theme
 
@@ -69,6 +70,9 @@ nitpick_classes = ['redis.ConnectionPool', 'redis.connection.ConnectionPool', 'd
 
 nitpicky = True
 nitpick_ignore = []
+
+for name in dir(builtins):
+    nitpick_ignore = [('py:class', name)]
 
 for cls_name in nitpick_classes:
     nitpick_ignore.append(('py:class', cls_name))
