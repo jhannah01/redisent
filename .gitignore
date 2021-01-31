@@ -1,8 +1,8 @@
 .DS_Store
 .env*
-/activate
+/activate*
 /.local/
-/.venv/
+/.venv*/
 /*.egg-info
 *.sqlite?
 *.pid
