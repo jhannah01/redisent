@@ -1,6 +1,3 @@
-import mockaioredis
-import mockredis
-
 import pytest
 import aioredis
 
