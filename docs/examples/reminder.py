@@ -70,8 +70,8 @@ class Reminder(RedisEntry):
     provided_when: str = field(default_factory=str)
     content: str = field(default_factory=str)
 
-    trigger_ts: float = field(default_factory=str)
-    created_ts: float = field(default_factory=str)
+    trigger_ts: float = field(default_factory=float)
+    created_ts: float = field(default_factory=float)
 
     is_complete: bool = field(default=False, compare=False)
 

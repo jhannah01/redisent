@@ -1,20 +1,21 @@
-import aioredis
-import pytest
 import mockaioredis
+import mockredis
+
+import pytest
+import aioredis
+
+import fakeredis
 import fakeredis.aioredis
+import redis
 
 pytestmark = [pytest.mark.asyncio]
 
 
-@pytest.fixture
-def fake_server(request):
-    server = fakeredis.FakeServer()
-    server.connected = request.node.get_closest_marker('disconnected') is None
-    return server
+@pytest.fixture()
+def use_fake_aioredis(mocker):
+    mocker.patch.object(aioredis, 'ConnectionsPool', new=fakeredis.aioredis.FakeConnectionsPool)
 
 
-@pytest.fixture(autouse=True)
-def redis(mocker):
-    mocker.patch.object(aioredis, 'create_redis_pool', new=mockaioredis.create_redis_pool)
-
-
+@pytest.fixture()
+def use_fake_redis(mocker):
+    mocker.patch.object(redis, 'StrictRedis', new=fakeredis.FakeStrictRedis)

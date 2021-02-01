@@ -1,24 +1,12 @@
 redisent package
 ================
 
-Submodules
-----------
-
-redisent.connection module
---------------------------
-
-.. automodule:: redisent.connection
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 redisent.errors module
 ----------------------
 
-.. automodule:: redisent.errors
+.. autoexception:: redisent.errors.RedisError
    :members:
-   :undoc-members:
-   :show-inheritance:
+   :private-members:
 
 redisent.helpers module
 -----------------------
@@ -33,20 +21,4 @@ redisent.models module
 
 .. automodule:: redisent.models
    :members:
-   :undoc-members:
    :private-members:
-
-redisent.utils module
----------------------
-
-.. automodule:: redisent.utils
-   :members:
-   :undoc-members:
-
-Module contents
----------------
-
-.. automodule:: redisent
-   :members:
-   :undoc-members:
-   :show-inheritance:

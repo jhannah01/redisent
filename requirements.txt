@@ -1,15 +1,10 @@
-aredis
 aioredis
-discord
-discord-py-slash-command
 dateparser
 IPython
-jupyterlab
 sphinx
 sphinx-autodoc-typehints
 sphinx_rtd_theme
 setuptools
-mockaioredis
 pytest
 pytest-asyncio
 pytest-mock

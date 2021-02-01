@@ -1,7 +1,10 @@
+import aioredis
+
 import pytest
 import fakeredis.aioredis
 
 from datetime import datetime, timedelta
+
 from redisent.helpers import RedisentHelper
 
 # Symlinked from ../examples/reminder.py
@@ -24,13 +27,13 @@ def build_reminder(use_dt: datetime = None, num_minutes: int = 5, created_ts: fl
 
 
 @pytest.mark.asyncio
-async def test_async_store_reminder(fake_server):
-    r_pool = await fakeredis.aioredis.create_redis_pool(fake_server)
-
+async def test_async_store_reminder(use_fake_aioredis):
     rem = build_reminder()
 
+    r_pool = await RedisentHelper.build_pool_async(redis_uri='redis://localhost')
+
     try:
-        rh = await RedisentHelper.build_async(redis_pool=r_pool)
+        rh = RedisentHelper(r_pool, is_async=True)
 
         async with rh.wrapped_redis(op_name=f'hexists("reminders", "{rem.redis_name}")') as r_conn:
             res = await r_conn.hexists('reminders', rem.redis_name)
@@ -52,9 +55,9 @@ async def test_async_store_reminder(fake_server):
             r_pool.close()
             await r_pool.wait_closed()
 
-
-def test_blocking_store_reminder(fake_server):
-    rh = RedisentHelper.build(redis_pool=fake_server)
+def test_blocking_store_reminder(use_fake_redis):
+    pool = RedisentHelper.build_pool_sync(redis_uri='localhost')
+    rh = RedisentHelper(pool)
     rem = build_reminder()
 
     with rh.wrapped_redis(op_name=f'hexists("reminders", "{rem.redis_name}")') as r_conn:
@@ -68,6 +71,8 @@ def test_blocking_store_reminder(fake_server):
     assert rem_fetched, f'No response back fetching "reminder" entry for "{rem.redis_name}". Got: {rem_fetched}'
 
     assert rem == rem_fetched, f'Fetched entry does not match original.\nFetched:\n{rem_fetched.dump()}\nCreated:\n{rem.dump()}'
+
+    print(f'Successfully retrieved Reminder entry back. Dump:\n{rem.dump()}')
 
     with rh.wrapped_redis(op_name=f'hdel("reminders", "{rem.redis_name}")') as r_conn:
         res = r_conn.hdel('reminders', rem.redis_name)

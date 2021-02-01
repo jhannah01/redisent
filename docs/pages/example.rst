@@ -73,8 +73,8 @@ By using the :py:func:`redisent.helpers.RedisentHelper.wrapped_redis` context ma
 
 .. note::
 
-   The :py:func:`redisent.helpers.RedisentHelper.wrapped_redis` property will point to either the blocking context manager :py:meth:`redisent.helpers.RedisentHelper._wrapped_redis_blocking`.
-   If however ``use_async`` is set to ``True``, the :py:meth:`redisent.helpers.RedisentHelper._wrapped_redis_async` context manager is used.
+   The :py:func:`redisent.helpers.RedisentHelper.wrapped_redis` property will point to either the blocking context manager :py:meth:`redisent.helpers.RedisentHelper.wrapped_redis_sync`.
+   If however ``use_async`` is set to ``True``, the :py:meth:`redisent.helpers.RedisentHelper.wrapped_redis_async` context manager is used.
 
    See also the Python documentation on `With Statement Context Managers <https://docs.python.org/3/reference/datamodel.html#context-managers>`_ for more details about how context managers work generally as well as the documentation for :py:func:`contextlib.asynccontextmanager` and :py:func:`contextlib.contextmanager`.
 

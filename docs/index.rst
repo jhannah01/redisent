@@ -2,7 +2,7 @@ Documentation for the redisent Python library
 =============================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Contents:
    :glob:
 
