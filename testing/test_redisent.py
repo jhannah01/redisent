@@ -1,17 +1,16 @@
 import pytest
 
-import fakeredis.aioredis
-
+from datetime import datetime
 from pprint import pformat
-from redisent import RedisentHelper
+from redisent import RedisentHelper, RedisError, RedisEntry
 
 
 @pytest.mark.asyncio
-async def test_async_redis(fake_server):
-    r_pool = await fakeredis.aioredis.create_redis_pool(fake_server)
+async def test_async_redis(use_fake_aioredis):
+    r_pool = await RedisentHelper.build_pool_async(redis_uri='redis://localhost')
 
     try:
-        rh = RedisentHelper(redis_pool=r_pool, use_async=True)
+        rh = RedisentHelper(redis_pool=r_pool)
 
         async with rh.wrapped_redis(op_name='set(blarg, 5.7)') as r_conn:
             res = await r_conn.set('blarg', 5.7)
@@ -53,8 +52,9 @@ async def test_async_redis(fake_server):
             await r_pool.wait_closed()
 
 
-def test_blocking_redis(redis):
-    rh = RedisentHelper.build(redis_pool=redis)
+def test_blocking_redis(use_fake_redis):
+    pool = RedisentHelper.build_pool_sync(redis_uri='redis://localhost')
+    rh = RedisentHelper(pool, is_async=False)
 
     with rh.wrapped_redis(op_name='set(blarg=5.7)') as r_conn:
         res = r_conn.set('blarg', 5.7)
@@ -118,6 +118,37 @@ def test_blocking_redis(redis):
     print('All hash tests complete')
 
 
-def test_bad_redis_url():
-    with pytest.raises(ValueError):
-        helper = RedisentHelper.build()
+def test_bad_sync_redis_value(use_fake_redis):
+    r_pool = RedisentHelper.build_pool_sync(redis_uri='localhost')
+    rh = RedisentHelper(r_pool, is_async=False)
+
+    with pytest.raises(RedisError):
+        with rh.wrapped_redis(op_name='set(bad_val, ...)') as r_conn:
+            r_conn.set('bad_val', {'one': 1, 'oh_no': datetime.now()})
+
+
+@pytest.mark.asyncio
+async def test_bad_async_redis_value(use_fake_aioredis):
+    r_pool = await RedisentHelper.build_pool_async(redis_uri='redis://localhost')
+    rh = RedisentHelper(r_pool)
+
+    try:
+        async with rh.wrapped_redis(op_name='set(bad_val, ...)') as r_conn:
+            await r_conn.set('bad_val', {'one': 1, 'oh_no': datetime.now()})
+    except RedisError as ex:
+        print(f'Caught expected RedisError: "{ex}"')
+        print(f'repr(ex):\n{repr(ex)}')
+        print(f'Dumping Exception:\n{ex.dump()}')
+    except Exception as ex:
+        pytest.fail(f'Received un-expected exception instead of "RedisError": {ex}', True)
+
+
+def test_redis_error():
+    try:
+        raise RedisError('Oh what a dumb error', related_command=None, extra_attrs={'value': 5, 'ts': datetime.now()})
+    except RedisError as ex:
+        print(f'Caught expected dummy RedisError: "{ex}"')
+        print(f'repr(ex):\n{repr(ex)}')
+        print(f'Dumping Exception:\n{ex.dump()}')
+    except Exception as ex:
+        pytest.fail(f'Received un-expected exception instead of "RedisError": {ex}', True)

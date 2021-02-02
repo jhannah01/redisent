@@ -2,10 +2,11 @@ Documentation for the redisent Python library
 =============================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Contents:
    :glob:
 
+   README <pages/README>
    Introduction <pages/intro>
    Basic Example <pages/example>
    Usage with asyncio <pages/async>

@@ -10,7 +10,7 @@ from redisent.models import RedisEntry
 root_logger = logging.getLogger(__name__)
 log_ch = logging.StreamHandler()
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 LOG_LEVEL = logging.DEBUG
 
 
@@ -26,4 +26,4 @@ def setup_logger(log_level: int = logging.DEBUG, squelch: bool = False):
 
 setup_logger(log_level=LOG_LEVEL, squelch=TYPE_CHECKING)
 
-__all__ = ['RedisError', 'RedisentHelper', 'RedisEntry']
+__all__ = ['RedisError', 'RedisentHelper', 'RedisEntry', 'setup_logger']

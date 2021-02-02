@@ -3,6 +3,8 @@ Introducing ``redisent``, a Python library which leverages Python [dataclasses](
 
 Under the hood, Python [pickle](https://docs.python.org/3/library/pickle.html) library is used to convert the ``dataclass`` field values in ``byte`` values that can be stored directly in Redis.
 
+[![Documentation Status](https://readthedocs.org/projects/redisent/badge/?version=latest)](https://redisent.readthedocs.io/en/latest/?badge=latest)
+
 ## Quick Start
 
 First things first, ``redisent`` needs to be installed. Most often this is done by adding ``redisent`` to any ``requirements.txt`` files and using ``pip`` to install it.

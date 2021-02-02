@@ -1,19 +1,39 @@
+from __future__ import annotations
+
 from typing import Mapping, Any, Optional
 
 
 class RedisError(Exception):
-    message: str
+    """
+    Exception class for Redisent-raised errors
 
-    base_exception: Optional[Exception]
-    related_command: str
-    extra_attrs: Mapping[str, Any] = {}
+    Exceptions of this type will be raised for almost any errors encountered within ``redisent``
+
+    This class also offers the :py:func`redisent.errors.RedisError.dump` method which can be used to build a verbose blurb about the
+    error and available context
+    """
+
+    message: str  #: Error Message
+
+    base_exception: Optional[Exception]  #: Optional base :py:exc:`Exception` raise prior to this error
+    related_command: Optional[str]       #: The Redis command or ``op_name`` that caused this error (if available)
+    extra_attrs: Mapping[str, Any] = {}  #: Mapping of optional contextual attributes related to this error
 
     def __init__(self, message: str, base_exception: Exception = None, related_command: str = None, extra_attrs: Mapping[str, Any] = None) -> None:
+        """
+        Build a new ``RedisError`` exception with optionally provided contextual details
+
+        :param message: the error message
+        :param base_exception: an optional base exception related to this one
+        :param related_command: if available, the related ``op_name`` / Redis command that raised this error (otherwise this will be "N/A")
+        :param extra_attrs: optional mapping of related values at the time of the exception being raised
+        """
+
         super(RedisError, self).__init__(message)
 
         self.message = message
         self.base_exception = base_exception
-        self.related_command = related_command or 'Unknown'
+        self.related_command = related_command
         self.extra_attrs = extra_attrs or {}
 
     def __repr__(self) -> str:
@@ -35,3 +55,21 @@ class RedisError(Exception):
             str_out = f'{str_out}with command "{self.related_command}"'
 
         return f'{str_out}: {self.message}'
+
+    def dump(self) -> str:
+        """
+        Helper method for building a verbose textual representation of the error and any available context at the time
+        of the exception being raised
+        """
+
+        dump_out = str(self) + '\n'
+
+        if self.base_exception:
+            dump_out += f'-> Base Error:\t"{self.base_exception}\n"'
+
+        if self.extra_attrs:
+            dump_out += f'Extra Context:\n'
+            for ex_key, ex_val in self.extra_attrs.items():
+                dump_out += f'= "{ex_key}"\t-> "{ex_val}"'
+
+        return dump_out

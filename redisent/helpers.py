@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 
 import aioredis
 import logging
 import pickle
+
 import redis
 import functools
 
+from concurrent.futures.thread import ThreadPoolExecutor
 from contextlib import contextmanager, asynccontextmanager
 from typing import Callable
 
@@ -19,79 +22,10 @@ logger = logging.getLogger(__name__)
 
 class RedisentHelper:
     redis_pool: RedisPoolType
-    use_async: bool = False
-
-    @classmethod
-    def build(cls, redis_pool: redis.ConnectionPool = None, redis_url: str = None) -> RedisentHelper:
-        """
-        Builder class method for creating a blocking ``redis``-powered helper instance
-
-        This method will handle building the pool, if not provided, from the value of ``redis_url`` which will be formatted by
-        the :py:meth:`RedisentHelper.format_redis_url` method.
-
-        :param redis_pool: if provided, this :py:class:`redis.ConnectionPool` instance will be used for the Redis pool
-        :param redis_url: if no value for ``redis_pool`` is provided, use this value to build a Redis URL and connection pool
-        """
-
-        if not redis_pool:
-            if not redis_url:
-                raise ValueError('No value provided for "redis_pool" or "redis_url"')
-
-            redis_url = cls.format_redis_url(redis_url)
-            redis_pool = redis.ConnectionPool.from_url(redis_url)
-
-        return RedisentHelper(redis_pool=redis_pool, use_async=False)
-
-    @classmethod
-    async def build_async(cls, redis_pool: aioredis.ConnectionsPool = None, redis_url: str = None) -> RedisentHelper:
-        """
-        Builder class method for creating an ``aioredis``-powered helper instance
-
-        This method will handle building the pool, if not provided, from the value of ``redis_url`` which will be formatted by
-        the :py:meth:`RedisentHelper.format_redis_url` method.
-
-        :param redis_pool: if provided, this :py:class:`aioredis.ConnectionsPool` instance will be used for the Redis pool
-        :param redis_url: if no value for ``redis_pool`` is provided, use this value to build a Redis URL and connection pool
-        """
-
-        if not redis_pool:
-            if not redis_url:
-                raise ValueError('No value provided for "redis_pool" or "redis_url"')
-
-            redis_url = cls.format_redis_url(redis_url)
-            redis_pool = await aioredis.create_redis_pool(redis_url)
-
-        return RedisentHelper(redis_pool=redis_pool, use_async=True)
-
-    @classmethod
-    def format_redis_url(cls, redis_url: str) -> str:
-        """
-        Helper class method for correctly formatting a given hostname into a ``redis://``-prefixed URI
-
-        :param redis_url: the hostname with or without the ``redis://`` prefix
-        """
-
-        return f'redis://{redis_url}' if not redis_url.startswith('redis://') else redis_url
-
-    def __init__(self, redis_pool: RedisPoolType, use_async: bool = None) -> None:
-        """
-        Simple ``ctor`` method called by both the :py:meth:`RedisentHelper.build` and :py:meth:`RedisentHelper.build_async` methods
-
-        :param redis_pool:  the Redis pool to use. If ``use_async`` is set to ``True`` this should be a configured instance
-                            of :py:class:`aioredis.ConnectionsPool`, otherwise this should be an instance of :py:class:`redis.ConnectionPool`
-
-        :param use_async:   indicates if ``aioredis`` should be used under the hood. if not provided, the type of the value
-                            for the``redis_pool`` argument is interrogated to determine if this instance should use ``asyncio`` methods or not
-        """
-        self.redis_pool = redis_pool
-
-        if use_async is None:
-            use_async = isinstance(redis_pool, aioredis.ConnectionsPool)
-
-        self.use_async = use_async
+    is_async: bool
 
     @staticmethod
-    def _handle_decode_attempt(res, use_encoding: str = None, decode_handler: Callable = None):
+    def handle_decode_attempt(res, use_encoding: str = None, decode_handler: Callable = None):
         """
         Internal handler for attempting to intelligently decode any discovered :py:class:`redisent.models.RedisEntry` instances found
 
@@ -124,16 +58,16 @@ class RedisentHelper:
 
     def decode_entries(self, use_encoding: str = None, first_handler: Callable = None, final_handler: Callable = None):
         """
-        Decorator used for automatically attempting to decode the returned value of a method using the static method ``_handle_decode_attempt``
+        Decorator used for automatically attempting to decode the returned value of a method using the static method ``handle_decode_attempt``
 
-        This is helpful for automatically returning :py:class:`redisent.models.RedisEntry` instances and / or the opportunity to interact with the results via the
-        two ``Callable`` arguments ``first_handler`` and ``final_handler``.
+        This is helpful for automatically returning :py:class:`redisent.models.RedisEntry` instances and / or the opportunity to interact with
+        the results via the two ``Callable`` arguments ``first_handler`` and ``final_handler``.
 
-        If provided, the ``first_handler`` is used first, prior to attempting to using the ``_handle_decode_attempt`` static method. Finally, if provided,
-        the ``final_handler`` will be called prior to passing the possibly decoded response back to the caller.
+        If provided, the ``first_handler`` is used first, prior to attempting to using the ``handle_decode_attempt`` static method. Finally,
+        if provided, the ``final_handler`` will be called prior to passing the possibly decoded response back to the caller.
 
-        This decorator can be used with ``asyncio`` coroutine or regular methods. The inner decorator uses :py:func:`asyncio.iscoroutinefunction` to determine if
-        the wrapped method is a a coroutine and calls the handlers accordingly.
+        This decorator can be used with ``asyncio`` coroutine or regular methods. The inner decorator uses :py:func:`asyncio.iscoroutinefunction`
+        to determine if the wrapped method is a a coroutine and calls the handlers accordingly.
 
         :param use_encoding: if provided, indicates the results should be decoded using the provided encoding (generally ``utf-8``)
         :param first_handler: first callback handler to invoke __prior__ to attempting to decode the result
@@ -145,26 +79,112 @@ class RedisentHelper:
                 @functools.wraps(func)
                 async def _async_wrapper(*args, **kwargs):
                     res = await func(*args, **kwargs)
-                    return first_handler(res) if first_handler else self._handle_decode_attempt(res, use_encoding, decode_handler=final_handler)
+                    return first_handler(res) if first_handler else self.handle_decode_attempt(res, use_encoding, decode_handler=final_handler)
 
                 return _async_wrapper
             else:
                 @functools.wraps(func)
                 def _blocking_wrapper(*args, **kwargs):
                     res = func(*args, **kwargs)
-                    return first_handler(res) if first_handler else self._handle_decode_attempt(res, use_encoding, decode_handler=final_handler)
+                    return first_handler(res) if first_handler else self.handle_decode_attempt(res, use_encoding, decode_handler=final_handler)
 
                 return _blocking_wrapper
 
         return _outer_wrapper
 
-    wrapped_redis = property(fget=lambda self: self._wrapped_redis_blocking if not self.use_async else self._wrapped_redis_async)
+    def __init__(self, redis_pool: RedisPoolType, is_async: bool = None) -> None:
+        """
+        Simple ``ctor`` method for building ``RedisentHelper`` instance from a given ``RedisPoolType``
+
+        If the pool is asynchronous, the ``is_async`` attribute must be ``True``. The inverse is true for non-asynchronous
+        pool instances.
+
+        If ``is_async`` is not provided (which defaults to ``None``) the default behavior is to determine if the helper should act
+        asynchronously based on the class type of ``redis_pool``.
+
+        This is important to keep in mind during testing since mocking the respective :py:mod:`redis` or :py:mod:`aioredis` internals
+        might cause the default check here to incorrectly presume async or sync. The default check uses this to cover support
+        for `fakeredis <https://pypi.org/project/fakeredis/>`_:
+
+        .. code-block:: python
+
+           if 'pytest' in sys.modules:
+               import fakeredis
+
+               logger.info('Running under pytest, checking for mocked redis/aioredis classes')
+               is_async = not isinstance(redis_pool, (fakeredis.FakeConnection, redis.ConnectionPool,))
+           else:
+               is_async = isinstance(redis_pool, aioredis.ConnectionsPool)
+
+        .. seealso::
+
+           This method is called by :py:func:`RedisentHelper.build_pool_async` and:py:func:`RedisentHelper.build_pool_sync` also
+
+        :param redis_pool: Redis connection pool helper should use
+        :param is_async: if provided, indicates explicitly if the pool is asynchronous or not.
+                         otherwise, the type of ``redis_pool`` will be used to determine this.
+        """
+
+        if is_async is None:
+            if 'pytest' in sys.modules:
+                import fakeredis
+
+                logger.info('Running under pytest, checking for mocked redis/aioredis classes')
+                is_async = not isinstance(redis_pool, (fakeredis.FakeConnection, redis.ConnectionPool,))
+            else:
+                is_async = isinstance(redis_pool, aioredis.ConnectionsPool)
+
+        self.redis_pool = redis_pool
+        self.is_async = is_async
+
+    @classmethod
+    def build_pool_sync(cls, redis_uri: str) -> redis.ConnectionPool:
+        """
+        Build a :py:class:`redis.ConnectionPool` instance from the given Redis URI
+
+        This method uses ``redis.connection.ConnectionPool.from_url`` under the hood to build the connection pool
+
+        :param redis_uri: URI of Redis server (will be prefixed with ``redis://`` if not present)
+        """
+
+        if not redis_uri.startswith('redis://'):
+            redis_uri = f'redis://{redis_uri}'
+
+        return redis.ConnectionPool.from_url(redis_uri)
+
+    @classmethod
+    async def build_pool_async(cls, redis_uri: str) -> aioredis.ConnectionsPool:
+        """
+        Build a :py:class:`aioredis.ConnectionsPool` instance from the given Redis URI
+
+        This method uses :py:func:`aioredis.create_redis_pool`  under the hood to build the connection pool
+
+        :param redis_uri: URI of Redis server (will be prefixed with ``redis://`` if not present)
+        """
+
+        if not redis_uri.startswith('redis://'):
+            redis_uri = f'redis://{redis_uri}'
+
+        return await aioredis.create_redis_pool(redis_uri)
+
+    # Context managers for wrapped_redis helper
+    @asynccontextmanager
+    async def wrapped_redis_async(self, op_name: str = None):
+        op_name = op_name or 'N/A'
+
+        try:
+            logger.debug(f'Executing Async Redis command for "{op_name}"...')
+            yield self.redis_pool
+        except Exception as ex:
+            logger.exception(f'Encountered Redis Error running "{op_name}": {ex}')
+            raise RedisError(f'Redis Error executing "{op_name}": {ex}', base_exception=ex, related_command=op_name)
 
     @contextmanager
-    def _wrapped_redis_blocking(self, op_name: str, use_pool: redis.ConnectionPool = None):
-        pool = use_pool or self.redis_pool
+    def wrapped_redis_sync(self, op_name: str = None):
+        op_name = op_name or 'N/A'
+
         try:
-            r_conn = redis.Redis(connection_pool=pool)
+            r_conn = redis.Redis(connection_pool=self.redis_pool)
         except Exception as ex:
             err_message = f'Unable to build new Redis connection for "{op_name}": {ex}'
             logger.exception(err_message)
@@ -177,13 +197,4 @@ class RedisentHelper:
             logger.exception(err_message)
             raise RedisError(err_message, base_exception=ex, related_command=op_name)
 
-    @asynccontextmanager
-    async def _wrapped_redis_async(self, op_name: str, use_pool: aioredis.ConnectionsPool = None):
-        pool = use_pool or self.redis_pool
-
-        try:
-            logger.debug(f'Executing Async Redis command for "{op_name}"...')
-            yield pool
-        except Exception as ex:
-            logger.exception(f'Encountered Redis Error running "{op_name}": {ex}')
-            raise RedisError(f'Redis Error executing "{op_name}": {ex}', base_exception=ex, related_command=op_name)
+    wrapped_redis = property(fget=lambda self: self.wrapped_redis_async if self.is_async else self.wrapped_redis_sync)
