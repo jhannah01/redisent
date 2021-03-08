@@ -1,8 +1,16 @@
 aioredis
 redis
 dateparser
-IPython
 setuptools
+# Dev
+IPython
+jupyterlab
+# Docs
+sphinx
+sphinx-autodoc-typehints
+sphinx_rtd_theme
+recommonmark
+# Testing
 pytest
 pytest-asyncio
 pytest-mock
@@ -13,7 +21,4 @@ pytest-pep8
 mypy
 coverage
 fakeredis
-sphinx
-sphinx-autodoc-typehints
-sphinx_rtd_theme
-recommonmark
+tox

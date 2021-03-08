@@ -101,6 +101,9 @@ class RedisEntry:
             if is_int_fld and not include_internal_fields:
                 continue
 
+            if not fld.init:
+                continue
+
             flds.append(fld.name)
 
         return flds
