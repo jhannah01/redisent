@@ -10,7 +10,7 @@ from redisent.pubsub import RedisPubSub
 root_logger = logging.getLogger(__name__)
 log_ch = logging.StreamHandler()
 
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 LOG_LEVEL = logging.DEBUG
 
 
