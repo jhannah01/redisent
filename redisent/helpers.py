@@ -10,9 +10,8 @@ import pickle
 import redis
 import functools
 
-from concurrent.futures.thread import ThreadPoolExecutor
 from contextlib import contextmanager, asynccontextmanager
-from typing import Callable
+from typing import Callable, Union, Any, Optional
 
 from redisent.errors import RedisError
 from redisent.utils import RedisPoolType
@@ -25,16 +24,17 @@ class RedisentHelper:
     is_async: bool
 
     @staticmethod
-    def handle_decode_attempt(res, use_encoding: str = None, decode_handler: Callable = None):
+    def handle_decode_attempt(result_value, use_encoding: str = None, decode_handler: Callable[[Any], Optional[Any]] = None):
         """
         Internal handler for attempting to intelligently decode any discovered :py:class:`redisent.models.RedisEntry` instances found
 
+        :param result_value: the result to attempt to decode
         :param use_encoding: if provided, indicates the results should be decoded using the provided encoding (generally ``utf-8``)
-        :param first_handler: optional callback that will be called when attempting to decode response
+        :param decode_handler: optional callback that will be called when attempting to decode response
         """
 
-        if not res:
-            return res
+        if not result_value:
+            return result_value
 
         def decode_value(value):
             try:
@@ -47,14 +47,14 @@ class RedisentHelper:
 
                 return value
 
-        if isinstance(res, list):
-            res = [decode_value(ent) for ent in res]
-        elif isinstance(res, dict):
-            res = {ent_name.decode(use_encoding) if use_encoding else ent_name: decode_value(ent_value) for ent_name, ent_value in res.items()}
+        if isinstance(result_value, list):
+            result_value = [decode_value(ent) for ent in result_value]
+        elif isinstance(result_value, dict):
+            result_value = {ent_name.decode(use_encoding) if use_encoding else ent_name: decode_value(ent_value) for ent_name, ent_value in result_value.items()}
         elif use_encoding:
-            res = res.decode(use_encoding)
+            result_value = result_value.decode(use_encoding)
 
-        return res
+        return result_value
 
     def decode_entries(self, use_encoding: str = None, first_handler: Callable = None, final_handler: Callable = None):
         """
@@ -91,6 +91,32 @@ class RedisentHelper:
                 return _blocking_wrapper
 
         return _outer_wrapper
+
+    async def get_connection_async(self) -> aioredis.Redis:
+        """
+        Asynchronous method for creating a new Redis connection which will return a connection :py:class:`aioredis.Redis`
+
+        The caller is responsible for all management of the connection life-cycle including closing the connection when no longer
+        needed.
+        """
+        return await aioredis.Redis(pool_or_conn=self.redis_pool)
+
+    def get_connection_sync(self, strict_client: bool = False) -> Union[redis.StrictRedis, redis.Redis]:
+        """
+        Synchronous method for creating a new Redis connection which will return a connected :py:class:`redis.Redis` or
+        :py:class:`redis.StrictRedis` instance, based on the provided ``strict_client`` value.
+
+        The caller is responsible for all management of the connection life-cycle including closing the connection when no longer
+        needed.
+
+        :param strict_client: if specified return an instance of :py:class:`redis.StrictRedis`. By default an configured instance
+                              of :py:class:`redis.Redis` will be returned
+        """
+
+        conn_cls = redis.StrictRedis if strict_client else redis.Redis
+        return conn_cls(connection_pool=self.redis_pool)
+
+    get_connection = property(fget=lambda self: self.get_connection_async if self.is_async else self.get_connection_sync)
 
     def __init__(self, redis_pool: RedisPoolType, is_async: bool = None) -> None:
         """

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from redisent.errors import RedisError
 from redisent.helpers import RedisentHelper
 from redisent.models import RedisEntry
-
+from redisent.pubsub import RedisPubSub
 
 root_logger = logging.getLogger(__name__)
 log_ch = logging.StreamHandler()
@@ -26,4 +26,4 @@ def setup_logger(log_level: int = logging.DEBUG, squelch: bool = False):
 
 setup_logger(log_level=LOG_LEVEL, squelch=TYPE_CHECKING)
 
-__all__ = ['RedisError', 'RedisentHelper', 'RedisEntry', 'setup_logger']
+__all__ = ['RedisError', 'RedisentHelper', 'RedisEntry', 'RedisPubSub', 'setup_logger']

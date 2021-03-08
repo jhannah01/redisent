@@ -4,8 +4,8 @@ import asyncio
 import logging
 import pickle
 
-from dataclasses import is_dataclass, dataclass, field, fields, asdict
-from typing import Mapping, Any, List, Optional, MutableMapping
+from dataclasses import dataclass, field, fields, asdict
+from typing import Mapping, Any, List, Optional, MutableMapping, cast
 
 from redisent import RedisentHelper
 from redisent.errors import RedisError
@@ -83,8 +83,10 @@ class RedisEntry:
         """
         Class method used for building a list of strings for each field name, based on the provided filering attributes
 
-        :param include_redis_fields: if set, include fields with metadata indicating they are Redis-related fields (i.e. ``redis_id`` or ``redis_name``)
-        :param include_internal_fields: if set, include internal fields which are used by ``redisent`` only (any marked with metadata attribute ``internal_field``)
+        :param include_redis_fields:    if set, include fields with metadata indicating they are Redis-related fields (i.e.
+                                        ``redis_id`` or ``redis_name``)
+        :param include_internal_fields: if set, include internal fields which are used by ``redisent`` only (any marked
+                                        with metadata attribute ``internal_field``)
         """
 
         flds = []
@@ -125,7 +127,7 @@ class RedisEntry:
         return True if self.redis_name else False
 
     @classmethod
-    def load_dict(cls, redis_id: str, redis_name: str = None, **ent_kwargs):
+    def load_dict(cls, redis_id: str, redis_name: str = None, **ent_kwargs) -> RedisEntry:
         """
         Class method for loading a RedisEntry from a provided dictionary of values
 
@@ -138,8 +140,8 @@ class RedisEntry:
             if 'redis_name' in ent_kwargs:
                 redis_name = ent_kwargs.pop('redis_name')
 
-        cls_kwargs: MutableMapping[str, Any] = {attr: ent_kwargs[attr] for attr in cls.get_entry_fields(include_redis_fields=False, include_internal_fields=False) if attr in ent_kwargs}
-        # noinspection PyArgumentList
+        ent_fields = cls.get_entry_fields(include_redis_fields=False, include_internal_fields=False)
+        cls_kwargs: MutableMapping[str, Any] = {attr: ent_kwargs[attr] for attr in ent_fields if attr in ent_kwargs}
 
         cls_kwargs['redis_id'] = redis_id
         if redis_name:
@@ -154,8 +156,10 @@ class RedisEntry:
 
         By default no internal or redis fields (i.e. ``redis_id`` or ``redis_name``) are returned
 
-        :param include_redis_fields: if set, include fields with metadata indicating they are Redis-related fields (i.e. ``redis_id`` or ``redis_name``)
-        :param include_internal_fields: if set, include internal fields which are used by ``redisent`` only (any marked with metadata attribute ``internal_field``)
+        :param include_redis_fields:    if set, include fields with metadata indicating they are Redis-related fields (i.e. ``redis_id``
+                                        or ``redis_name``)
+        :param include_internal_fields: if set, include internal fields which are used by ``redisent`` only (any marked with metadata
+                                        attribute ``internal_field``)
         """
 
         ent_dict = asdict(self)
@@ -202,7 +206,7 @@ class RedisEntry:
             logger.exception(err_message)
             raise RedisError(err_message, base_exception=ex)
         except Exception as ex:
-            err_message = f'General error while attempting to decode possible RedisEntry'
+            err_message = 'General error while attempting to decode possible RedisEntry'
             logger.exception(f'{err_message}: {ex}')
             raise RedisError(err_message, base_exception=ex)
 
@@ -245,9 +249,9 @@ class RedisEntry:
 
         with helper.wrapped_redis(op_name=op_name) as r_conn:
             if not self.redis_name:
-                return r_conn.set(self.redis_id, entry_bytes)
+                return True if r_conn.set(self.redis_id, entry_bytes) else False
 
-            return r_conn.hset(self.redis_id, self.redis_name, entry_bytes)
+            return True if r_conn.hset(self.redis_id, self.redis_name, entry_bytes) else False
 
     async def store_async(self, helper: RedisentHelper) -> bool:
         """
@@ -267,9 +271,9 @@ class RedisEntry:
 
         async with helper.wrapped_redis(op_name=op_name) as r_conn:
             if self.redis_name:
-                return await r_conn.hset(self.redis_id, self.redis_name, entry_bytes)
+                return True if await r_conn.hset(self.redis_id, self.redis_name, entry_bytes) else False
 
-            return await r_conn.set(self.redis_id, entry_bytes)
+            return True if await r_conn.set(self.redis_id, entry_bytes) else False
 
     def store(self, helper: RedisentHelper) -> bool:
         """
@@ -330,7 +334,7 @@ class RedisEntry:
         if not entry_bytes:
             raise RedisError(f'Failure during fetch of key "{redis_id}"{name_str}: No data returned')
 
-        return cls.decode_entry(entry_bytes)
+        return cast(RedisEntry, cls.decode_entry(entry_bytes))
 
     @classmethod
     async def fetch_async(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
@@ -359,7 +363,7 @@ class RedisEntry:
         if not entry_bytes:
             raise RedisError(f'Failure during fetch of key "{redis_id}"{name_str}: No data returned')
 
-        return cls.decode_entry(entry_bytes)
+        return cast(RedisEntry, cls.decode_entry(entry_bytes))
 
     @classmethod
     def fetch(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
@@ -396,3 +400,81 @@ class RedisEntry:
             return res
 
         return cls.fetch_sync(helper, redis_id, redis_name=redis_name)
+
+    @classmethod
+    def exists_sync(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> bool:
+        """
+        Synchronous method for checking if a given ``redis_id`` (and optional ``redis_name`` value, if provided) actually exists in Redis
+
+        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
+        :param redis_id: the Redis ID for entry
+        :param redis_name: if provided, attempt to lookup hashmap based on this value
+        """
+
+        op_name = f'hexists("{redis_id}", "{redis_name}")' if redis_name else f'exists("{redis_id}")'
+        with helper.wrapped_redis(op_name) as r_conn:
+            res = r_conn.hexists(redis_id, redis_name) if redis_name else r_conn.exists(redis_id)
+            return True if res else False
+
+    @classmethod
+    async def exists_async(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> bool:
+        """
+        Asynchronous method for checking if a given ``redis_id`` (and optional ``redis_name`` value, if provided) actually exists in Redis
+
+        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
+        :param redis_id: the Redis ID for entry
+        :param redis_name: if provided, attempt to lookup hashmap based on this value
+        """
+
+        op_name = f'hexists("{redis_id}", "{redis_name}")' if redis_name else f'exists("{redis_id}")'
+        async with helper.wrapped_redis(op_name) as r_conn:
+            res = await (r_conn.hexists(redis_id, redis_name) if redis_name else r_conn.exists(redis_id))
+            return True if res else False
+
+    def delete_sync(self, helper: RedisentHelper, check_exists: bool = True) -> bool:
+        """
+        Synchronous method responsible for actually deleting a RedisEntry from Redis
+
+        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
+        :param check_exists: if set, check first that there is an existing Redis entry for this instance
+        """
+
+        if check_exists:
+            if not self.exists_sync(helper, self.redis_id, redis_name=self.redis_name):
+                redis_key = '"{self.redis_id}"'
+                if self.redis_name:
+                    redis_key = f'{redis_key} (redis_name: "{self.redis_name}")'
+
+                logger.warning(f'Request to delete entry {redis_key} failed: No such entry in Redis')
+                return False
+
+        op_name = f'hdel("{self.redis_id}", "{self.redis_name}")' if self.redis_name else f'delete("{self.redis_id}")'
+        with helper.wrapped_redis(op_name) as r_conn:
+            res = r_conn.hdel(self.redis_id, self.redis_name) if self.redis_name else r_conn.delete(self.redis_id)
+            return True if res else False
+
+    async def delete_async(self, helper: RedisentHelper, check_exists: bool = True) -> bool:
+        """
+        Asynchronous method responsible for actually deleting a RedisEntry from Redis
+
+        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
+        :param check_exists: if set, check first that there is an existing Redis entry for this instance
+        """
+
+        if check_exists:
+            if not await self.exists_async(helper, self.redis_id, redis_name=self.redis_name):
+                redis_key = '"{self.redis_id}"'
+                if self.redis_name:
+                    redis_key = f'{redis_key} (redis_name: "{self.redis_name}")'
+
+                logger.warning(f'Request to delete entry {redis_key} failed: No such entry in Redis')
+                return False
+
+        op_name = f'hdel("{self.redis_id}", "{self.redis_name}")' if self.redis_name else f'delete("{self.redis_id}")'
+        async with helper.wrapped_redis(op_name) as r_conn:
+            if self.redis_name:
+                return True if await r_conn.hdel(self.redis_id, self.redis_name) else False
+
+            return True if await r_conn.delete(self.redis_id) else False
+
+    delete = property(fget=lambda self: self.delete_async if self.is_async else self.delete_sync)
