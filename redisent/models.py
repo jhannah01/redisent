@@ -74,7 +74,7 @@ class RedisEntry:
             dump_out = f'{dump_out}, hash entry "{self.redis_name}":'
 
         for attr in self.get_entry_fields(include_redis_fields=False, include_internal_fields=False):
-            dump_out = f'{dump_out}\n=> {attr}\t-> "{getattr(self, attr)}"'
+            dump_out = f'{dump_out}\n  => {attr}  \t-> "{getattr(self, attr)}"'
 
         return dump_out
 
@@ -404,46 +404,16 @@ class RedisEntry:
 
         return cls.fetch_sync(helper, redis_id, redis_name=redis_name)
 
-    @classmethod
-    def exists_sync(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> bool:
-        """
-        Synchronous method for checking if a given ``redis_id`` (and optional ``redis_name`` value, if provided) actually exists in Redis
-
-        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
-        :param redis_id: the Redis ID for entry
-        :param redis_name: if provided, attempt to lookup hashmap based on this value
-        """
-
-        op_name = f'hexists("{redis_id}", "{redis_name}")' if redis_name else f'exists("{redis_id}")'
-        with helper.wrapped_redis(op_name) as r_conn:
-            res = r_conn.hexists(redis_id, redis_name) if redis_name else r_conn.exists(redis_id)
-            return True if res else False
-
-    @classmethod
-    async def exists_async(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> bool:
-        """
-        Asynchronous method for checking if a given ``redis_id`` (and optional ``redis_name`` value, if provided) actually exists in Redis
-
-        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
-        :param redis_id: the Redis ID for entry
-        :param redis_name: if provided, attempt to lookup hashmap based on this value
-        """
-
-        op_name = f'hexists("{redis_id}", "{redis_name}")' if redis_name else f'exists("{redis_id}")'
-        async with helper.wrapped_redis(op_name) as r_conn:
-            res = await (r_conn.hexists(redis_id, redis_name) if redis_name else r_conn.exists(redis_id))
-            return True if res else False
-
     def delete_sync(self, helper: RedisentHelper, check_exists: bool = True) -> bool:
         """
         Synchronous method responsible for actually deleting a RedisEntry from Redis
 
-        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
+        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to delete the entry
         :param check_exists: if set, check first that there is an existing Redis entry for this instance
         """
 
         if check_exists:
-            if not self.exists_sync(helper, self.redis_id, redis_name=self.redis_name):
+            if not helper.exists_sync(helper, self.redis_id, redis_name=self.redis_name):
                 redis_key = '"{self.redis_id}"'
                 if self.redis_name:
                     redis_key = f'{redis_key} (redis_name: "{self.redis_name}")'
@@ -460,12 +430,12 @@ class RedisEntry:
         """
         Asynchronous method responsible for actually deleting a RedisEntry from Redis
 
-        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
+        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to delete the entry
         :param check_exists: if set, check first that there is an existing Redis entry for this instance
         """
 
         if check_exists:
-            if not await self.exists_async(helper, self.redis_id, redis_name=self.redis_name):
+            if not await helper.exists_async(helper, self.redis_id, redis_name=self.redis_name):
                 redis_key = '"{self.redis_id}"'
                 if self.redis_name:
                     redis_key = f'{redis_key} (redis_name: "{self.redis_name}")'
@@ -480,4 +450,11 @@ class RedisEntry:
 
             return True if await r_conn.delete(self.redis_id) else False
 
-    delete = property(fget=lambda self: self.delete_async if self.is_async else self.delete_sync)
+    def delete(self, helper: RedisentHelper, check_exists: bool = True) -> bool:
+        if helper.is_async:
+            loop = asyncio.get_event_loop_policy().get_event_loop()
+            res = loop.run_until_complete(self.delete_async(helper, check_exists=check_exists))
+            loop.close()
+            return res
+
+        return self.delete_sync(helper, check_exists=check_exists)

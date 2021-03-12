@@ -11,7 +11,7 @@ import redis
 import functools
 
 from contextlib import contextmanager, asynccontextmanager
-from typing import Callable, Union, Any, Optional
+from typing import Callable, Union, Any, Optional, List
 
 from redisent.errors import RedisError
 from redisent.utils import RedisPoolType
@@ -50,7 +50,12 @@ class RedisentHelper:
         if isinstance(result_value, list):
             result_value = [decode_value(ent) for ent in result_value]
         elif isinstance(result_value, dict):
-            result_value = {ent_name.decode(use_encoding) if use_encoding else ent_name: decode_value(ent_value) for ent_name, ent_value in result_value.items()}
+            results = {}
+            for ent_name, ent_value in result_value.items():
+                ent_name = ent_name.decode(use_encoding) if use_encoding else ent_name
+                results[ent_name] = decode_value(ent_value)
+
+            return results
         elif use_encoding:
             result_value = result_value.decode(use_encoding)
 
@@ -116,7 +121,27 @@ class RedisentHelper:
         conn_cls = redis.StrictRedis if strict_client else redis.Redis
         return conn_cls(connection_pool=self.redis_pool)
 
-    get_connection = property(fget=lambda self: self.get_connection_async if self.is_async else self.get_connection_sync)
+    def get_connection(self, redis_id: str, redis_name: str = None) -> bool:
+        """
+        Wrapper method for creating a new Redis connection based on the configured value of ``self.is_async``
+
+        Under the hood, this wrapper will either (asyncronously) call :py:func:`RedisentHelper.get_connection_async` or it will
+        fall through to call the syncronous :py:func:`RedisentHelper.get_connection_sync`.
+
+        The caller is responsible for all management of the connection life-cycle including closing the connection when no longer
+        needed.
+
+        :param strict_client: if specified return an instance of :py:class:`redis.StrictRedis`. By default an configured instance
+                              of :py:class:`redis.Redis` will be returned
+        """
+
+        if self.is_async:
+            loop = asyncio.get_event_loop_policy().get_event_loop()
+            res = loop.run_until_complete(self.get_connection_async(redis_id, redis_name=redis_name))
+            loop.close()
+            return res
+
+        return self.get_connection_sync(redis_id, redis_name=redis_name)
 
     def __init__(self, redis_pool: RedisPoolType, is_async: bool = None) -> None:
         """
@@ -224,3 +249,113 @@ class RedisentHelper:
             raise RedisError(err_message, base_exception=ex, related_command=op_name)
 
     wrapped_redis = property(fget=lambda self: self.wrapped_redis_async if self.is_async else self.wrapped_redis_sync)
+
+    async def keys_async(self, use_pattern: str = None, redis_id: str = None) -> List[str]:
+        """
+        Asynchronous method responsible for enumerating key values in Redis for hash and non-hash entries alike
+
+        If ``use_pattern`` and ``redis_id`` are not provided, this method will use ``KEYS(*)`` to lookup all Redis keys.
+
+        Otherwise, if ``redis_id`` is provided, a lookup of ``HKEYS(redis_id)`` will be done.
+
+        Finally, if ``use_pattern`` is provided, ``KEYS(use_pattern)`` will be used
+
+        :param use_pattern: if provided, use this value instead of ``*`` with ``KEYS``
+        :param redis_id: if provided, use ``HKEYS(redis_id)`` to lookup keys in the hash entry
+        """
+
+        if redis_id:
+            op_name = f'hkeys("{redis_id}")'
+        else:
+            use_pattern = use_pattern or '*'
+            op_name = f'keys("{use_pattern}")'
+
+        async with self.wrapped_redis(op_name) as r_conn:
+            return r_conn.hkeys(redis_id) if redis_id else r_conn.keys(use_pattern)
+
+    def keys_sync(self, use_pattern: str = None, redis_id: str = None) -> List[str]:
+        """
+        Synchronous method responsible for enumerating key values in Redis for hash and non-hash entries alike
+
+        If ``use_pattern`` and ``redis_id`` are not provided, this method will use ``KEYS(*)`` to lookup all Redis keys.
+
+        Otherwise, if ``redis_id`` is provided, a lookup of ``HKEYS(redis_id)`` will be done.
+
+        Finally, if ``use_pattern`` is provided, ``KEYS(use_pattern)`` will be used
+
+        :param use_pattern: if provided, use this value instead of ``*`` with ``KEYS``
+        :param redis_id: if provided, use ``HKEYS(redis_id)`` to lookup keys in the hash entry
+        """
+
+        if redis_id:
+            op_name = f'hkeys("{redis_id}")'
+        else:
+            use_pattern = use_pattern or '*'
+            op_name = f'keys("{use_pattern}")'
+
+        with self.wrapped_redis(op_name) as r_conn:
+            return r_conn.hkeys(redis_id) if redis_id else r_conn.keys(use_pattern)
+
+    def keys(self, use_pattern: str = None, redis_id: str = None) -> List[str]:
+        """
+        Wrapper method responsible for enumerating key values in Redis for hash and non-hash entries alike
+
+        If ``use_pattern`` and ``redis_id`` are not provided, this method will use ``KEYS(*)`` to lookup all Redis keys.
+
+        Otherwise, if ``redis_id`` is provided, a lookup of ``HKEYS(redis_id)`` will be done.
+
+        Finally, if ``use_pattern`` is provided, ``KEYS(use_pattern)`` will be used
+
+        :param use_pattern: if provided, use this value instead of ``*`` with ``KEYS``
+        :param redis_id: if provided, use ``HKEYS(redis_id)`` to lookup keys in the hash entry
+        """
+
+        if self.is_async:
+            loop = asyncio.get_event_loop_policy().get_event_loop()
+            res = loop.run_until_complete(self.keys_async(use_pattern=use_pattern, redis_id=redis_id))
+            loop.close()
+            return res
+
+        return self.keys_sync(use_pattern=use_pattern, redis_id=redis_id)
+
+    def exists_sync(self, redis_id: str, redis_name: str = None) -> bool:
+        """
+        Synchronous method for checking if a given ``redis_id`` (and optional ``redis_name`` value, if provided) actually exists in Redis
+
+        :param redis_id: the Redis ID for entry
+        :param redis_name: if provided, attempt to lookup hashmap based on this value
+        """
+
+        op_name = f'hexists("{redis_id}", "{redis_name}")' if redis_name else f'exists("{redis_id}")'
+        with self.wrapped_redis(op_name) as r_conn:
+            res = r_conn.hexists(redis_id, redis_name) if redis_name else r_conn.exists(redis_id)
+            return True if res else False
+
+    async def exists_async(self, redis_id: str, redis_name: str = None) -> bool:
+        """
+        Asynchronous method for checking if a given ``redis_id`` (and optional ``redis_name`` value, if provided) actually exists in Redis
+
+        :param redis_id: the Redis ID for entry
+        :param redis_name: if provided, attempt to lookup hashmap based on this value
+        """
+
+        op_name = f'hexists("{redis_id}", "{redis_name}")' if redis_name else f'exists("{redis_id}")'
+        async with self.wrapped_redis(op_name) as r_conn:
+            res = await (r_conn.hexists(redis_id, redis_name) if redis_name else r_conn.exists(redis_id))
+            return True if res else False
+
+    def exists(self, redis_id: str, redis_name: str = None) -> bool:
+        """
+        Wrapper method for checking if a given ``redis_id`` (and optional ``redis_name`` value, if provided) actually exists in Redis
+
+        :param redis_id: the Redis ID for entry
+        :param redis_name: if provided, attempt to lookup hashmap based on this value
+        """
+
+        if self.is_async:
+            loop = asyncio.get_event_loop_policy().get_event_loop()
+            res = loop.run_until_complete(self.exists_async(redis_id, redis_name=redis_name))
+            loop.close()
+            return res
+
+        return self.exists_sync(redis_id, redis_name=redis_name)

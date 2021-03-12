@@ -152,3 +152,18 @@ def test_redis_error():
         print(f'Dumping Exception:\n{ex.dump()}')
     except Exception as ex:
         pytest.fail(f'Received un-expected exception instead of "RedisError": {ex}', True)
+
+
+
+def test_helper_methods_sync(use_fake_redis):
+    r_pool = RedisentHelper.build_pool_sync(redis_uri='localhost')
+    rh = RedisentHelper(r_pool, is_async=False)
+
+    with rh.wrapped_redis(op_name=f'hset(testing, value, 1)') as r_conn:
+        r_conn.hset('testing', 'value', 1)
+
+    assert rh.exists('testing'), 'Cannot find newly set "testing" key'
+
+    found_keys = rh.keys(use_pattern='test*')
+
+    assert b'testing' in found_keys, f'Cannot find newly set key "testing" in lookup of "test*". Found: "{found_keys}"'
