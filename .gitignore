@@ -3,13 +3,14 @@
 /activate*
 /.local/
 /.venv*/
-/*.egg-info
+/src/*.egg-info
 *.sqlite?
 *.pid
 .*.sw[poc]
 *.py[co]
 __pycache__/
-/build/
+/build
+/dist
 .azure/
 .idea/
 ipy/.ipynb_checkpoints

@@ -71,13 +71,6 @@ Next using the already created instance of :py:class:`redisent.helpers.RedisentH
 
 By using the :py:func:`redisent.helpers.RedisentHelper.wrapped_redis` context manager, a new Redis connection is created for calling ``hkeys("reminders")`` and finally the keys are dumped out (with no encoding, hence the result being represented as ``bytes``. Using the Redis command ``hget("reminders", "12345:1610323201.801648")`` will similarly return the ``bytes``-encoded blob representing the ``Reminder`` class within Redis.
 
-.. note::
-
-   The :py:func:`redisent.helpers.RedisentHelper.wrapped_redis` property will point to either the blocking context manager :py:meth:`redisent.helpers.RedisentHelper.wrapped_redis_sync`.
-   If however ``use_async`` is set to ``True``, the :py:meth:`redisent.helpers.RedisentHelper.wrapped_redis_async` context manager is used.
-
-   See also the Python documentation on `With Statement Context Managers <https://docs.python.org/3/reference/datamodel.html#context-managers>`_ for more details about how context managers work generally as well as the documentation for :py:func:`contextlib.asynccontextmanager` and :py:func:`contextlib.contextmanager`.
-
 Retrieving an entry from Redis
 ------------------------------
 Finally, we can fetch back the original reminder from Redis using :py:meth:`redisent.models.RedisEntry.fetch`:

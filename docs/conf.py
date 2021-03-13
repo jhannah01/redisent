@@ -5,7 +5,7 @@ import builtins
 import sys
 import sphinx_rtd_theme
 
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('../src'))
 
 from redisent import __version__ as redisent_version
 
@@ -45,7 +45,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_static_path = ['_static']
 pygments_style = 'monokai'
 
-nitpick_classes = ['redis.ConnectionPool', 'redis.connection.ConnectionPool', 'datetime',
+nitpick_classes = ['redis.Redis', 'redis.ConnectionPool', 'redis.connection.ConnectionPool', 'datetime',
                    'aioredis.pool.ConnectionsPool', 'asyncio.events.AbstractEventLoop']
 
 nitpicky = True
@@ -64,8 +64,7 @@ source_suffix = {
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
-    'aioredis': ('https://aioredis.readthedocs.io/en/latest/', None),
-    'redis': ('https://redis-py.readthedocs.io/en/stable/', None),
+    'redis-py': ('https://redis-py.readthedocs.io/en/stable/', None),
 }
 
 

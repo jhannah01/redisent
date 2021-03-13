@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import redis
+
 from typing import Mapping, Any, Optional
 
 
@@ -18,6 +20,16 @@ class RedisError(Exception):
     base_exception: Optional[Exception]  #: Optional base :py:exc:`Exception` raise prior to this error
     related_command: Optional[str]       #: The Redis command or ``op_name`` that caused this error (if available)
     extra_attrs: Mapping[str, Any] = {}  #: Mapping of optional contextual attributes related to this error
+
+    @property
+    def is_connection_error(self) -> bool:
+        """
+        Indicates if the underlying error was related to a connection failure
+
+        If ``base_exception`` is an instance of ``redis.exceptions.ConnectionError``, this will return ``True``
+        """
+
+        return self.base_exception and isinstance(self.base_exception, redis.exceptions.ConnectionError)
 
     def __init__(self, message: str, base_exception: Exception = None, related_command: str = None, extra_attrs: Mapping[str, Any] = None) -> None:
         """

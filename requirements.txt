@@ -1,24 +1,8 @@
-aioredis
 redis
 dateparser
 setuptools
+tabulate
+redislite
 # Dev
 IPython
-jupyterlab
-# Docs
-sphinx
-sphinx-autodoc-typehints
-sphinx_rtd_theme
-recommonmark
-# Testing
-pytest
-pytest-asyncio
-pytest-mock
-pytest-cov
-pytest-mypy
-pytest-flake8
-pytest-pep8
-mypy
-coverage
-fakeredis
-tox
+# jupyterlab

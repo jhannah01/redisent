@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import pickle
 
 from dataclasses import dataclass, field, fields, asdict
+from tabulate import tabulate
 from typing import Mapping, Any, List, Optional, MutableMapping, cast
 
 from redisent import RedisentHelper
@@ -63,7 +63,7 @@ class RedisEntry:
     redis_id: str = field(metadata={'redis_field': True})                                   #: Redis ID for this entry
     redis_name: Optional[str] = field(default_factory=str, metadata={'redis_field': True})  #: Optional Redis hashmap name
 
-    def dump(self) -> str:
+    def dump(self, include_redis_fields: bool = True) -> str:
         """
         Helper for dumping a textual representation of a particular :py:class:`redisent.models.RedisEntry` instance
         """
@@ -73,8 +73,11 @@ class RedisEntry:
         if self.redis_name:
             dump_out = f'{dump_out}, hash entry "{self.redis_name}":'
 
-        for attr in self.get_entry_fields(include_redis_fields=False, include_internal_fields=False):
-            dump_out = f'{dump_out}\n  => {attr}  \t-> "{getattr(self, attr)}"'
+        entry_attrs = self.get_entry_fields(include_redis_fields=include_redis_fields, include_internal_fields=False)
+        entry_data = [[attr, getattr(self, attr)] for attr in entry_attrs]
+        tbl = tabulate(entry_data, headers=['Attribute', 'Value'], tablefmt='presto')
+
+        dump_out += f'\n\n{tbl}'
 
         return dump_out
 
@@ -233,16 +236,13 @@ class RedisEntry:
             ent_str = f' (entry name: "{entry.redis_name}")' if entry.redis_name else ''
             raise Exception(f'Error encoding entry for "{entry.redis_id}"{ent_str} using pickle: {ex}')
 
-    def store_sync(self, helper: RedisentHelper) -> bool:
+    def store(self, helper: RedisentHelper) -> bool:
         """
         Blocking / synchronous method for storing this entry in Redis, using the provided :py:class:`redisent.helpers.RedisentHelper` instance.
 
         This method will do the actual encoding using the :py:func:`RedisEntry.encode_entry` method as well as make use of the provided
         helper :py:func:`redisent.helpers.RedisentHelper.wrapped_redis` (actually, this method makes use of
-        the :py:func:`redisent.helpers.RedisentHelper.wrapped_redis_sync`) context manager for storing the entry in Redis.
-
-        .. seealso::
-           See also the :py:func:`RedisEntry.store_async` asynchronous method documentation
+        the :py:func:`redisent.helpers.RedisentHelper.wrapped_redis`) context manager for storing the entry in Redis.
 
         :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used for storing entry
         """
@@ -256,72 +256,15 @@ class RedisEntry:
 
             return True if r_conn.hset(self.redis_id, self.redis_name, entry_bytes) else False
 
-    async def store_async(self, helper: RedisentHelper) -> bool:
-        """
-        asyncio / asynchronous method for storing this entry in Redis, using the provided :py:class:`redisent.helpers.RedisentHelper` instance.
-
-        This method will do the actual encoding using the :py:func:`RedisEntry.encode_entry` method as well as make use of the provided
-        helper :py:func:`redisent.helpers.RedisentHelper.wrapped_redis` (actually, this method makes use of
-        the :py:func:`redisent.helpers.RedisentHelper.wrapped_redis_async`) context manager for storing the entry in Redis.
-
-        .. seealso::
-           See also the :py:func:`RedisEntry.store_sync` synchronous method documentation
-
-        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
-        """
-        entry_bytes = self.encode_entry(self)
-        op_name = f'set(key="{self.redis_id}")' if not self.redis_name else f'hset(key="{self.redis_id}", name="{self.redis_name}")'
-
-        async with helper.wrapped_redis(op_name=op_name) as r_conn:
-            if self.redis_name:
-                return True if await r_conn.hset(self.redis_id, self.redis_name, entry_bytes) else False
-
-            return True if await r_conn.set(self.redis_id, entry_bytes) else False
-
-    def store(self, helper: RedisentHelper) -> bool:
-        """
-        A synchronous / asynchronous agnostic wrapper for storing a :py:class:`RedisEntry` instance in Redis
-
-        The corresponding :py:func:`RedisEntry.store_sync` or :py:func:`RedisEntry.store_async` will be called as
-        determined be the configured :py:attr:`redisent.helpers.RedisentHelper.redis_pool` type.
-
-        If the helper is async, :py:func:`asyncio.get_event_loop_policy` and :py:func:`asyncio.get_event_loop` methods are used
-        to derive or otherwise create a new ``asyncio`` event loop. This event loop will be used to execute the
-        :py:func:`RedisEntry.store_async` method.
-
-        .. note::
-
-           There are some caveats with this approach. Namely, if the event loop is stopped or not running, this method might not
-           behave quite as expected. Whenever possible, it is best to directly call the correct ``*_sync`` or ``*_async`` method.
-
-        .. seealso::
-
-           The documentation for the synchronous :py:func:`RedisEntry.store_sync` as well as the corresponding asynchronous
-           :py:func:`RedisEntry.store_async` method
-
-        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
-        """
-
-        if helper.is_async:
-            loop = asyncio.get_event_loop_policy().get_event_loop()
-            res = loop.run_until_complete(self.store_async(helper))
-            loop.close()
-            return res
-
-        return self.store_sync(helper)
-
     @classmethod
-    def fetch_sync(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
+    def fetch(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
         """
         Blocking / synchronous method for fetching entries from Redis, using the provided :py:class:`redisent.helpers.RedisentHelper`
         instance.
 
         This method will do the actual decoding using the :py:func:`RedisEntry.decode_entry` method after fetching the ``bytes`` value
         from Redis using the helper-provided :py:func:`redisent.helpers.RedisentHelper.wrapped_redis` (actually, this method makes use of
-        the :py:func:`redisent.helpers.RedisentHelper.wrapped_redis_sync`) context manager for actually fetching from Redis.
-
-        .. seealso::
-           See also the :py:func:`RedisEntry.fetch_async` asynchronous method documentation
+        the :py:func:`redisent.helpers.RedisentHelper.wrapped_redis`) context manager for actually fetching from Redis.
 
         :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used for storing entry
         :param redis_id: unique Redis ID for entry
@@ -339,72 +282,7 @@ class RedisEntry:
 
         return cast(RedisEntry, cls.decode_entry(entry_bytes))
 
-    @classmethod
-    async def fetch_async(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
-        """
-        asyncio / asynchronous method for fetching entries from Redis, using the provided :py:class:`redisent.helpers.RedisentHelper`
-        instance.
-
-        This method will do the actual decoding using the :py:func:`RedisEntry.decode_entry` method after fetching the ``bytes`` value
-        from Redis using the helper-provided :py:func:`redisent.helpers.RedisentHelper.wrapped_redis` (actually, this method makes use of
-        the :py:func:`redisent.helpers.RedisentHelper.wrapped_redis_async`) context manager for actually fetching from Redis.
-
-        .. seealso::
-           See also the :py:func:`RedisEntry.fetch_sync` synchronous method documentation
-
-        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
-        :param redis_id: unique Redis ID for entry
-        :param redis_name: unique Redis hashmap name (if entity is stored as a hashmap, this is required)
-        """
-
-        op_name = f'get(key="{redis_id}")' if not redis_name else f'hget(key="{redis_id}", name="{redis_name}")'
-        name_str = f' of entry "{redis_name}"' if redis_name else ''
-
-        async with helper.wrapped_redis(op_name=op_name) as r_conn:
-            entry_bytes = await (r_conn.get(redis_id) if not redis_name else r_conn.hget(redis_id, redis_name))
-
-        if not entry_bytes:
-            raise RedisError(f'Failure during fetch of key "{redis_id}"{name_str}: No data returned')
-
-        return cast(RedisEntry, cls.decode_entry(entry_bytes))
-
-    @classmethod
-    def fetch(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None) -> RedisEntry:
-        """
-        A synchronous / asynchronous agnostic wrapper for fetching entries from redis, using the provided
-        :py:class:`redisent.helpers.RedisentHelper`
-
-        The corresponding :py:func:`RedisEntry.fetch_sync` or :py:func:`RedisEntry.fetch_async` will be called as
-        determined be the configured :py:attr:`redisent.helpers.RedisentHelper.redis_pool` type.
-
-        If the helper is async, :py:func:`asyncio.get_event_loop_policy` and :py:func:`asyncio.get_event_loop` methods are used
-        to derive or otherwise create a new ``asyncio`` event loop. This event loop will be used to execute the
-        :py:func:`RedisEntry.fetch_async` method.
-
-        .. note::
-
-           There are some caveats with this approach. Namely, if the event loop is stopped or not running, this method might not
-           behave quite as expected. Whenever possible, it is best to directly call the correct ``*_sync`` or ``*_async`` method.
-
-        .. seealso::
-
-           The documentation for the synchronous :py:func:`RedisEntry.fetch_sync` as well as the corresponding asynchronous
-           :py:func:`RedisEntry.fetch_async` method
-
-        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to fetch the entry
-        :param redis_id: unique Redis ID for entry
-        :param redis_name: unique Redis hashmap name (if entity is stored as a hashmap, this is required)
-        """
-
-        if helper.is_async:
-            loop = asyncio.get_event_loop_policy().get_event_loop()
-            res = loop.run_until_complete(cls.fetch_async(helper, redis_id, redis_name=redis_name))
-            loop.close()
-            return res
-
-        return cls.fetch_sync(helper, redis_id, redis_name=redis_name)
-
-    def delete_sync(self, helper: RedisentHelper, check_exists: bool = True) -> bool:
+    def delete(self, helper: RedisentHelper, check_exists: bool = True) -> bool:
         """
         Synchronous method responsible for actually deleting a RedisEntry from Redis
 
@@ -413,7 +291,7 @@ class RedisEntry:
         """
 
         if check_exists:
-            if not helper.exists_sync(helper, self.redis_id, redis_name=self.redis_name):
+            if not helper.exists(helper, self.redis_id, redis_name=self.redis_name):
                 redis_key = '"{self.redis_id}"'
                 if self.redis_name:
                     redis_key = f'{redis_key} (redis_name: "{self.redis_name}")'
@@ -425,36 +303,3 @@ class RedisEntry:
         with helper.wrapped_redis(op_name) as r_conn:
             res = r_conn.hdel(self.redis_id, self.redis_name) if self.redis_name else r_conn.delete(self.redis_id)
             return True if res else False
-
-    async def delete_async(self, helper: RedisentHelper, check_exists: bool = True) -> bool:
-        """
-        Asynchronous method responsible for actually deleting a RedisEntry from Redis
-
-        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used to delete the entry
-        :param check_exists: if set, check first that there is an existing Redis entry for this instance
-        """
-
-        if check_exists:
-            if not await helper.exists_async(helper, self.redis_id, redis_name=self.redis_name):
-                redis_key = '"{self.redis_id}"'
-                if self.redis_name:
-                    redis_key = f'{redis_key} (redis_name: "{self.redis_name}")'
-
-                logger.warning(f'Request to delete entry {redis_key} failed: No such entry in Redis')
-                return False
-
-        op_name = f'hdel("{self.redis_id}", "{self.redis_name}")' if self.redis_name else f'delete("{self.redis_id}")'
-        async with helper.wrapped_redis(op_name) as r_conn:
-            if self.redis_name:
-                return True if await r_conn.hdel(self.redis_id, self.redis_name) else False
-
-            return True if await r_conn.delete(self.redis_id) else False
-
-    def delete(self, helper: RedisentHelper, check_exists: bool = True) -> bool:
-        if helper.is_async:
-            loop = asyncio.get_event_loop_policy().get_event_loop()
-            res = loop.run_until_complete(self.delete_async(helper, check_exists=check_exists))
-            loop.close()
-            return res
-
-        return self.delete_sync(helper, check_exists=check_exists)

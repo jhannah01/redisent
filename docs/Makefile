@@ -1,17 +1,14 @@
-# Minimal makefile for Sphinx documentation
-#
-
-# You can set these variables from the command line, and also
-# from the environment for the first two.
+# Add "--keep-going" for debugging with multiple sphinx-build issues.
 SPHINXOPTS    ?= -vv -W -n
 SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = .
 BUILDDIR      = build
 
-# Put it first so that "make" without argument is like "make help".
 help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
+# Used to publish the build documentation to the local nginx webroot
+# I use "/var/www/html/redisent" for this.
 pushwww:
 	rsync --delete -hrPvi "$(BUILDDIR)/html/" "/var/www/html/redisent/"
 

@@ -1,25 +1,43 @@
 import os.path
 import setuptools
 
-from redisent import __version__ as redisent_version
+with open('README.md', 'rt') as f:
+    readme_contents = f.read()
 
-req_path = os.path.join(os.path.dirname(__file__), 'requirements.txt')
-with open(req_path, 'rt') as f:
-    install_reqs = [req.rstrip('\n') for req in f.readlines()]
+with open('requirements.txt', 'rt') as f:
+    install_requirements = [req.rstrip('\n') for req in f.readlines()]
 
+with open('docs/requirements.txt', 'rt') as f:
+    doc_requirements = [req.rstrip('\n') for req in f.readlines()]
+
+with open('testing/requirements.txt', 'rt') as f:
+    test_requirements = [req.rstrip('\n') for req in f.readlines()]
+    
 
 setuptools.setup(
     name='redisent',
-    version=redisent_version,
-    packages=setuptools.find_packages(where='.'),
-    url='https://github.com/jhannah01/redisent',
-    license='',
     author='Jon Hannah',
     author_email='jon@synistree.com',
     description='Python library for reading and storing entries of dataclasses in Redis',
+    keywords='redis, serialization',
+    long_description=readme_contents,
+    long_description_content_type='text/markdown',
+    url='https://github.com/jhannah01/redisent',
+    project_urls={
+        'Documentation': 'https://redisent.readthedocs.io/en/latest/',
+        'Source Code': 'https://github.com/jhannah01/redisent'},
+    package_dir={'': 'src'},
+    packages=setuptools.find_packages(where='src'),
+    python_requires='>=3.8',
+    extras_require={
+        'dev': ['IPython', 'jupyterlab'],
+        'test': test_requirements,
+        'docs': doc_requirements
+    },
     include_package_data=True,
     package_data={
         'redisent': ['py.typed']
     },
-    install_requires=install_reqs
+    install_requires=install_requirements,
+    # license=''
 )

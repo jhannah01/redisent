@@ -1,17 +1,18 @@
 import logging
+import os
 
 from typing import TYPE_CHECKING
 
 from redisent.errors import RedisError
 from redisent.helpers import RedisentHelper
 from redisent.models import RedisEntry
-from redisent.pubsub import RedisPubSub
+from redisent.types import RedisPrimitiveType, RedisType, is_redislite_instance
 
 root_logger = logging.getLogger(__name__)
 log_ch = logging.StreamHandler()
 
-__version__ = '0.0.3'
-LOG_LEVEL = logging.DEBUG
+__version__ = '0.1.0'
+LOG_LEVEL = logging.DEBUG if os.environ.get('REDISENT_DEBUG', False) else logging.CRITICAL
 
 
 def setup_logger(log_level: int = logging.DEBUG, squelch: bool = False):
@@ -24,6 +25,7 @@ def setup_logger(log_level: int = logging.DEBUG, squelch: bool = False):
         root_logger.debug('Logging started for redisent.')
 
 
-setup_logger(log_level=LOG_LEVEL, squelch=TYPE_CHECKING)
+if os.environ.get('REDISENT_LOGGING', True):
+    setup_logger(log_level=LOG_LEVEL, squelch=TYPE_CHECKING)
 
-__all__ = ['RedisError', 'RedisentHelper', 'RedisEntry', 'RedisPubSub', 'setup_logger']
+__all__ = ['RedisError', 'RedisentHelper', 'RedisEntry', 'RedisPrimitiveType', 'RedisType', 'is_redislite_instance', 'setup_logger']
