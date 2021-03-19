@@ -1,5 +1,5 @@
 # redisent
-Introducing ``redisent``, a Python library which leverages Python [dataclasses](https://docs.python.org/3/library/dataclasses.html) along with [redis-py](https://github.com/andymccurdy/redis-py) (or the ``asyncio``-enabled [aioredis](https://github.com/aio-libs/aioredis) library) for persisting and loading data from Redis.
+Introducing ``redisent``, a Python library which leverages Python [dataclasses](https://docs.python.org/3/library/dataclasses.html) along with [redis-py](https://github.com/andymccurdy/redis-py) for persisting and loading data from Redis.
 
 Under the hood, Python [pickle](https://docs.python.org/3/library/pickle.html) library is used to convert the ``dataclass`` field values in ``byte`` values that can be stored directly in Redis.
 

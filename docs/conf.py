@@ -45,8 +45,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_static_path = ['_static']
 pygments_style = 'monokai'
 
-nitpick_classes = ['redis.Redis', 'redis.ConnectionPool', 'redis.connection.ConnectionPool', 'datetime',
-                   'aioredis.pool.ConnectionsPool', 'asyncio.events.AbstractEventLoop']
+nitpick_classes = ['redis.Redis', 'redis.ConnectionPool', 'redis.connection.ConnectionPool', 'datetime']
 
 nitpicky = True
 nitpick_ignore = []
