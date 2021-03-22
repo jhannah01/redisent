@@ -104,7 +104,7 @@ class RedisentHelper:
         Simple ``ctor`` method for building ``RedisentHelper`` instance from a given ``RedisPoolType``
 
         :param redis_pool: Redis connection pool helper should use
-        :param use_redis: primarily for testing, this instance of one of the ``redis`` or ``redislite`` classes in the type :py:type:`redisent.types.RedisType`.
+        :param use_redis: primarily for testing, this instance of one of the ``redis`` or ``redislite`` classes in the type ``redisent.types.RedisType``.
                           if provided, the :py:func:`RedisentHelper.get_connection` method will return it instead of building a new one with the
                           provided ``redis_pool`` (which is ignored)
         """
@@ -119,7 +119,7 @@ class RedisentHelper:
     @classmethod
     def build_pool(cls, redis_uri: str) -> redis.ConnectionPool:
         """
-        Build a :py:class:`redis.ConnectionPool` instance from the given Redis URI
+        Build a ``redis.ConnectionPool`` instance from the given Redis URI
 
         This method uses ``redis.connection.ConnectionPool.from_url`` under the hood to build the connection pool
 

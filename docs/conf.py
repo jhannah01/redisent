@@ -45,7 +45,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_static_path = ['_static']
 pygments_style = 'monokai'
 
-nitpick_classes = ['redis.Redis', 'redis.ConnectionPool', 'redis.connection.ConnectionPool', 'datetime']
+nitpick_classes = ['redis.Redis', 'redis.ConnectionPool', 'redis.connection.ConnectionPool', 'datetime', 'redis.client.Redis', 'redislite.client.Redis', 'redislite.client.StrictRedis']
 
 nitpicky = True
 nitpick_ignore = []
@@ -63,7 +63,8 @@ source_suffix = {
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
-    'redis-py': ('https://redis-py.readthedocs.io/en/stable/', None),
+    'redis': ('https://redis-py.readthedocs.io/en/stable/', None),
+    'redislite': ('https://redislite.readthedocs.io/en/latest/', None)
 }
 
 
