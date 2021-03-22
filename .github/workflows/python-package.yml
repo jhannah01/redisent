@@ -40,4 +40,4 @@ jobs:
         py.test -v
     - name: Validate with tox
       run: |
-        tox
+        tox -e ${{ matrix.python-version }}
