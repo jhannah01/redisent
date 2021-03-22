@@ -37,3 +37,6 @@ jobs:
     - name: Test with pytest
       run: |
         py.test -v
+    - name: Validate with tox
+      run: |
+        tox
