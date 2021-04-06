@@ -291,7 +291,7 @@ class RedisEntry:
         """
 
         if check_exists:
-            if not helper.exists(helper, self.redis_id, redis_name=self.redis_name):
+            if not helper.exists(self.redis_id, redis_name=self.redis_name):
                 redis_key = '"{self.redis_id}"'
                 if self.redis_name:
                     redis_key = f'{redis_key} (redis_name: "{self.redis_name}")'

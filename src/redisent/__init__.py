@@ -11,7 +11,7 @@ from redisent.types import RedisPrimitiveType, RedisType, is_redislite_instance
 root_logger = logging.getLogger(__name__)
 log_ch = logging.StreamHandler()
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 LOG_LEVEL = logging.DEBUG if os.environ.get('REDISENT_DEBUG', False) else logging.CRITICAL
 
 
