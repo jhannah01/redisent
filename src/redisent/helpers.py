@@ -6,7 +6,7 @@ import redis
 import functools
 
 from contextlib import contextmanager
-from typing import Callable, List, Any, Optional
+from typing import Callable, List, Any, Optional, Union
 
 from redisent.errors import RedisError
 from redisent.types import RedisType, is_redislite_instance
@@ -188,7 +188,7 @@ class RedisentHelper:
             res = r_conn.hexists(redis_id, redis_name) if redis_name else r_conn.exists(redis_id)
             return True if res else False
 
-    def entry_type(self, redis_id: str, check_exists: bool = True, use_encoding: str = None):
+    def entry_type(self, redis_id: str, check_exists: bool = True, use_encoding: str = None) -> Union[str, bytes]:
         """
         Determine the Redis type of the provided ``redis_id`` entry
 
