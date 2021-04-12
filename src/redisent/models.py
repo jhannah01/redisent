@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 import pickle
 
-from dataclasses import dataclass, field, fields, asdict
+from dataclasses import dataclass, field, fields, asdict, Field
 from tabulate import tabulate
-from typing import Mapping, Any, List, Optional, MutableMapping, cast
+from typing import Mapping, Any, List, Optional, MutableMapping, Union, cast
 
 from redisent import RedisentHelper
 from redisent.errors import RedisError
@@ -82,17 +82,17 @@ class RedisEntry:
         return dump_out
 
     @classmethod
-    def get_entry_fields(cls, include_redis_fields: bool = False, include_internal_fields: bool = False) -> List[str]:
+    def get_entry_fields(cls, include_redis_fields: bool = False, include_internal_fields: bool = False) -> Mapping[str, Field]:
         """
         Class method used for building a list of strings for each field name, based on the provided filering attributes
 
-        :param include_redis_fields:    if set, include fields with metadata indicating they are Redis-related fields (i.e.
-                                        ``redis_id`` or ``redis_name``)
+        :param include_redis_fields: if set, include fields with metadata indicating they are Redis-related fields (i.e.
+                                     ``redis_id`` or ``redis_name``)
         :param include_internal_fields: if set, include internal fields which are used by ``redisent`` only (any marked
                                         with metadata attribute ``internal_field``)
         """
 
-        flds = []
+        flds = {}
 
         for fld in fields(cls):
             is_redis_fld = fld.metadata.get('redis_field', False)
@@ -107,7 +107,7 @@ class RedisEntry:
             if not fld.init:
                 continue
 
-            flds.append(fld.name)
+            flds[fld.name] = fld
 
         return flds
 
@@ -120,7 +120,7 @@ class RedisEntry:
         will only return fields related to this specific entry's dataclass definition
         """
 
-        return self.get_entry_fields(include_redis_fields=False, include_internal_fields=False)
+        return list(self.get_entry_fields(include_redis_fields=False, include_internal_fields=False).keys())
 
     @property
     def is_hashmap(self) -> bool:

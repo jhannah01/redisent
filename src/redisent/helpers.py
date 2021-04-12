@@ -6,10 +6,10 @@ import redis
 import functools
 
 from contextlib import contextmanager
-from typing import Callable, List, Any, Optional, Union
+from typing import Callable, List, Any, Optional, Union, cast
 
 from redisent.errors import RedisError
-from redisent.types import RedisType, is_redislite_instance
+from redisent.common import RedisType, is_redislite_instance
 
 logger = logging.getLogger(__name__)
 
@@ -104,17 +104,17 @@ class RedisentHelper:
         Simple ``ctor`` method for building ``RedisentHelper`` instance from a given ``RedisPoolType``
 
         :param redis_pool: Redis connection pool helper should use
-        :param use_redis: primarily for testing, this instance of one of the ``redis`` or ``redislite`` classes in the type ``redisent.types.RedisType``.
+        :param use_redis: primarily for testing, this instance of one of the ``redis`` or ``redislite`` classes in the type ``redisent.common.RedisType``.
                           if provided, the :py:func:`RedisentHelper.get_connection` method will return it instead of building a new one with the
                           provided ``redis_pool`` (which is ignored)
         """
 
         if is_redislite_instance(redis_pool):
-            use_redis = redis_pool
-            redis_pool = None
-
-        self.redis_pool = redis_pool
-        self.use_redis = use_redis
+            self.use_redis = redis_pool
+            self.redis_pool = cast(redis.ConnectionPool, use_redis)
+        else:
+            self.redis_pool = redis_pool
+            self.use_redis = use_redis
 
     @classmethod
     def build_pool(cls, redis_uri: str) -> redis.ConnectionPool:
@@ -149,7 +149,7 @@ class RedisentHelper:
             logger.exception(err_message)
             raise RedisError(err_message, base_exception=ex, related_command=op_name)
 
-    def keys(self, use_pattern: str = None, redis_id: str = None, use_encoding: str = None) -> List[str]:
+    def keys(self, use_pattern: str = None, redis_id: str = None, use_encoding: str = None) -> Union[List[bytes], List[str]]:
         """
         Synchronous method responsible for enumerating key values in Redis for hash and non-hash entries alike
 
@@ -171,9 +171,12 @@ class RedisentHelper:
             op_name = f'keys("{use_pattern}")'
 
         with self.wrapped_redis(op_name) as r_conn:
-            found_keys = r_conn.hkeys(redis_id) if redis_id else r_conn.keys(use_pattern)
+            found_keys: List[bytes] = r_conn.hkeys(redis_id) if redis_id else r_conn.keys(use_pattern)
 
-        return found_keys if not use_encoding else [k_val.decode(use_encoding) for k_val in found_keys]
+        if not use_encoding:
+            return found_keys
+
+        return [k_val.decode(use_encoding) for k_val in found_keys]
 
     def exists(self, redis_id: str, redis_name: str = None) -> bool:
         """
@@ -188,25 +191,22 @@ class RedisentHelper:
             res = r_conn.hexists(redis_id, redis_name) if redis_name else r_conn.exists(redis_id)
             return True if res else False
 
-    def entry_type(self, redis_id: str, check_exists: bool = True, use_encoding: str = None) -> Union[str, bytes]:
+    def entry_type(self, redis_id: str, check_exists: bool = True) -> Optional[str]:
         """
         Determine the Redis type of the provided ``redis_id`` entry
 
-        If ``use_encoding`` is not provided, the default of ``utf-8`` will be used
-
         :param redis_id: the Redis ID for entry
         :param check_exists: if set, use the :py:func:`RedisentHelper.exists` method to validate the entry exists or return ``None``
-        :param use_encoding: override default encoding used when returning type value. default is to use ``utf-8``
         """
-
-        use_encoding = use_encoding or 'utf-8'
 
         if check_exists and not self.exists(redis_id):
             logger.warning(f'Request for type of "{redis_id}" failed: No such entry')
             return None
 
         with self.wrapped_redis(f'type("{redis_id}")') as r_conn:
-            return r_conn.type(redis_id).decode(use_encoding)
+            ent_type = r_conn.type(redis_id)
+
+        return cast(str, ent_type.decode('utf-8'))
 
     def get(self, redis_id: str, redis_name: str = None, throw_error: bool = True) -> Optional[Any]:
         """
@@ -225,7 +225,7 @@ class RedisentHelper:
 
             if throw_error:
                 extra_attrs = {'redis_id': redis_id, 'redis_name': redis_name}
-                raise MinderError(err_message, extra_attrs=extra_attrs)
+                raise RedisError(err_message, extra_attrs=extra_attrs)
 
             logger.error(err_message)
             return None
@@ -274,10 +274,10 @@ class RedisentHelper:
         if check_exists_type and self.exists(redis_id, redis_name=redis_name):
             entry_type = self.entry_type(redis_id)
             if is_hash and entry_type != 'hash':
-                raise MinderError(f'Type mismatch when attempting to overwrite Redis entry for "{redis_id}": Entry is a "{entry_type}", not hash map')
+                raise RedisError(f'Type mismatch when attempting to overwrite Redis entry for "{redis_id}": Entry is a "{entry_type}", not hash map')
 
             if not is_hash and entry_type == 'hash':
-                raise MinderError(f'Type mismatch when attempting to overwrite Redis entry for "{redis_id}": Entry is a hash map')
+                raise RedisError(f'Type mismatch when attempting to overwrite Redis entry for "{redis_id}": Entry is a hash map')
 
         with self.wrapped_redis(op_name) as r_conn:
             res = r_conn.hset(redis_id, redis_name, value) if is_hash else r_conn.set(redis_id, value)
@@ -292,9 +292,8 @@ class RedisentHelper:
         :param redis_id: the Redis ID for entry to remove
         :param redis_name: if provided, attempt to delete the named entry in the hashmap based on this value
         :param check_exists: if set, use the :py:func:`RedisentHelper.exists` method to validate the entry exists
-        :param throw_error: if set, raises a :py:exc:`RedisError` exception, otherwise ``None`` will be returned
-        :returns: boolean indicating if the entry was deleted. if the ``check_exists`` check fails, and ``throw_error`` is ``False``,
-                  then ``None`` will be returned
+        :returns: boolean indicating if the entry was deleted. if the ``check_exists`` check fails, ``None`` will
+                  be returned instead
         """
 
         if redis_name:
@@ -306,13 +305,10 @@ class RedisentHelper:
 
         if check_exists and not self.exists(redis_id, redis_name=redis_name):
             red_ent = '"{redis_id}"' if not is_hash else 'key "{redis_name}" of hashmap "{redis_id}"'
-            err_message = f'Unable to delete Redis entry for {red_ent}: No such entry / key'
-
-            if throw_error:
-                extra_attrs = {'op_name': op_name, 'redis_id': redis_id, 'redis_name': redis_name}
-                raise RedisError(err_message, extra_attrs=extra_attrs)
+            logger.warning(f'Unable to delete Redis entry for {red_ent}: No such entry / key')
+            return None
 
         with self.wrapped_redis(op_name) as r_conn:
-            res = r_conn.hget(redis_id, redis_name) if redis_name else r_conn.delete(redis_id)
+            res = r_conn.hdel(redis_id, redis_name) if redis_name else r_conn.delete(redis_id)
 
         return True if res else False

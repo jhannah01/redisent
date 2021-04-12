@@ -7,8 +7,6 @@ from dataclasses import dataclass, field
 
 from typing import Union, Optional, Mapping, Any, MutableMapping
 
-import dateparser
-
 from redisent import RedisEntry
 
 

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from redisent.errors import RedisError
 from redisent.helpers import RedisentHelper
 from redisent.models import RedisEntry
-from redisent.types import RedisPrimitiveType, RedisType, is_redislite_instance
+from redisent.common import RedisPrimitiveType, RedisType, is_redislite_instance
 
 root_logger = logging.getLogger(__name__)
 log_ch = logging.StreamHandler()

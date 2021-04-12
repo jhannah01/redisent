@@ -29,7 +29,7 @@ class RedisError(Exception):
         If ``base_exception`` is an instance of ``redis.exceptions.ConnectionError``, this will return ``True``
         """
 
-        return self.base_exception and isinstance(self.base_exception, redis.exceptions.ConnectionError)
+        return True if self.base_exception and isinstance(self.base_exception, redis.exceptions.ConnectionError) else False
 
     def __init__(self, message: str, base_exception: Exception = None, related_command: str = None, extra_attrs: Mapping[str, Any] = None) -> None:
         """
@@ -61,7 +61,7 @@ class RedisError(Exception):
         return f'{repr_out})>'
 
     def __str__(self) -> str:
-        str_out = f'Redis Error '
+        str_out = 'Redis Error '
 
         if self.related_command:
             str_out = f'{str_out}with command "{self.related_command}"'
@@ -80,7 +80,7 @@ class RedisError(Exception):
             dump_out += f'-> Base Error:\t"{self.base_exception}\n"'
 
         if self.extra_attrs:
-            dump_out += f'Extra Context:\n'
+            dump_out += 'Extra Context:\n'
             for ex_key, ex_val in self.extra_attrs.items():
                 dump_out += f'= "{ex_key}"\t-> "{ex_val}"'
 
