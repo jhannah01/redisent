@@ -251,9 +251,30 @@ class RedisEntry:
         return helper.set(self.redis_id, entry_bytes, redis_name=self.redis_name)
 
     @classmethod
+    def fetch_all(cls, helper: RedisentHelper, redis_id: str, check_exists: bool = True) -> Mapping[str, RedisEntry]:
+        """
+        Method for fetching **all** entries for a given hashmap from Redis, using the provided :py:class:`redisent.helpers.RedisentHelper`
+        instance.
+
+        Under the hood, this method will call the :py:func:`RedisentHelper.keys` method to enumerate all of the hashmap entry keys and
+        iteratively fetch them and return a mapping of hash keys to ``RedisEntry`` instances.
+
+        :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used for fetching entries
+        :param redis_id: unique Redis ID for hash map entries
+        :param check_exists: if set, check first that there is an existing Redis entry to fetch. If not, a :py:exc:`RedisEntry` is raised
+        """
+
+        if check_exists and not helper.exists(redis_id):
+            raise RedisError(f'Failed to find entry for "{redis_id}" in Redis while fetching all instances')
+
+        ent_keys = helper.keys(redis_id=redis_id, use_encoding='utf-8')
+        return {e_key: cls.fetch(helper, redis_id=redis_id, redis_name=e_key) for e_key in ent_keys}
+
+
+    @classmethod
     def fetch(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None, check_exists: bool = True) -> RedisEntry:
         """
-        Blocking / synchronous method for fetching entries from Redis, using the provided :py:class:`redisent.helpers.RedisentHelper`
+        Method for fetching entries from Redis, using the provided :py:class:`redisent.helpers.RedisentHelper`
         instance.
 
         This method will do the actual decoding using the :py:func:`RedisEntry.decode_entry` method after fetching the ``bytes`` value
