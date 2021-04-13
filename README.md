@@ -8,8 +8,8 @@ Under the hood, Python [pickle](https://docs.python.org/3/library/pickle.html) l
 
 | Branch | Documentation | Build |
 |--------|---------------|-------|
-| [devel](https://github.com/synistree/redisent/tree/devel) | [[![devel Documentation](https://readthedocs.org/projects/redisent/badge/?version=latest)](https://redisent.readthedocs.io/en/latest/?badge=latest) | [![devel](https://travis-ci.com/synistree/redisent.svg?branch=devel)](https://travis-ci.com/synistree/redisent) |
-| master | [![stable](https://readthedocs.org/projects/redisent/badge/?version=latest)](https://redisent.readthedocs.io/en/latest/?badge=stable) | [![master](https://travis-ci.com/synistree/redisent.svg?branch=master)](https://travis-ci.com/synistree/redisent)
+| [devel](https://github.com/synistree/redisent/tree/devel) | [![devel Documentation](https://readthedocs.org/projects/redisent/badge/?version=latest)](https://redisent.readthedocs.io/en/latest/?badge=latest) | [![devel](https://travis-ci.com/synistree/redisent.svg?branch=devel)](https://travis-ci.com/synistree/redisent) |
+| [master](https://github.com/synistree/redisent/tree/master) | [![stable](https://readthedocs.org/projects/redisent/badge/?version=latest)](https://redisent.readthedocs.io/en/latest/?badge=stable) | [![master](https://travis-ci.com/synistree/redisent.svg?branch=master)](https://travis-ci.com/synistree/redisent)
 
 ## Quick Start
 
@@ -97,8 +97,7 @@ $ source ./activate
 ```
 
 At this point, [IPython](https://ipython.org/) can be installed and started and the library used directly.
-```
 
-## Example: Reminder entity stored in Redis
+## More Examples
 
-iA basic example in the form of a simple reminder entity that can be stored in Redis is used for unit testing. See the [redisent Example documentation](https://redisent.readthedocs.io/en/latest/pages/example.html) for a more indepth explanation with specific examples.
+A basic example in the form of a simple reminder entity that can be stored in Redis is used for unit testing. See the [redisent Example documentation](https://redisent.readthedocs.io/en/latest/pages/example.html) for a more indepth explanation with specific examples.
