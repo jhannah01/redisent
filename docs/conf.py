@@ -33,12 +33,16 @@ exclude_patterns = []
 
 autoclass_content = 'both'
 autodoc_default_options = {
-        'members': True,
-        'member-order': 'bysource',
-        'special-members': '__init__',
-        'undoc-members': True,
-        'exclude-members': '__weakref__'
+    'members': True,
+    'member-order': 'bysource',
+    'special-members': '__init__',
+    'undoc-members': True,
+    'exclude-members': '__weakref__'
 }
+# autodoc_type_aliases = {
+#     'RedisType': 'redisent.common.RedisType',
+#     'RedisPoolType': 'redisent.common.RedisPoolType'
+# }
 
 html_theme = 'sphinx_rtd_theme'
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]

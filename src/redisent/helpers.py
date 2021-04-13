@@ -211,7 +211,7 @@ class RedisentHelper:
 
         :param redis_id: the Redis ID for entry
         :param redis_name: if provided, attempt to lookup hashmap based on this value
-        :param throw_error: if set, a :py:exc:`RedisError` exception will be raised if the entry cannot be fetched, otherwise ``None`` will be returned
+        :param throw_error: if set, a :py:exc:`redisent.errors.RedisError` exception will be raised if the entry cannot be fetched, otherwise ``None`` will be returned
         """
 
         if not self.exists(redis_id, redis_name=redis_name):
@@ -251,7 +251,7 @@ class RedisentHelper:
         Method for storing a value in Redis as ``redis_id`` and optional ``redis_name`` for storing hashmap data
 
         If ``redis_name`` is alos provided, this operation will use ``HSET`` to create a hashmap. Otherwise ``SET`` is used
-        and ``value`` must be an instance of one of the supported :py:cls:`RedisType` types.
+        and ``value`` must be an instance of one of the supported ``redisent.common.RedisType`` types.
 
         :param redis_id: the Redis ID for entry
         :param value: value to be stored in Redis. If this is not a hashmap, it must be a Redis primitive type of ``RedisType``
@@ -287,8 +287,7 @@ class RedisentHelper:
         :param redis_id: the Redis ID for entry to remove
         :param redis_name: if provided, attempt to delete the named entry in the hashmap based on this value
         :param check_exists: if set, use the :py:func:`RedisentHelper.exists` method to validate the entry exists
-        :returns: boolean indicating if the entry was deleted. if the ``check_exists`` check fails, ``None`` will
-                  be returned instead
+        :returns: bool indicating if the entry was deleted. if ``check_exists`` fails, ``None`` will be returned
         """
 
         if redis_name:

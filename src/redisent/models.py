@@ -256,7 +256,7 @@ class RedisEntry:
         Method for fetching **all** entries for a given hashmap from Redis, using the provided :py:class:`redisent.helpers.RedisentHelper`
         instance.
 
-        Under the hood, this method will call the :py:func:`RedisentHelper.keys` method to enumerate all of the hashmap entry keys and
+        Under the hood, this method will call the :py:func:`redisent.helpers.RedisentHelper.keys` method to enumerate all of the hashmap entry keys and
         iteratively fetch them and return a mapping of hash keys to ``RedisEntry`` instances.
 
         :param helper: configured instance of :py:class:`redisent.helpers.RedisentHelper` to be used for fetching entries
