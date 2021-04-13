@@ -51,6 +51,3 @@ $ source ./activate
 ```
 
 This will mean any changes to your local ``redisent`` repository will be realized immediately within the ``myproject`` virtualenv.
-
-## Basic Usage
-
