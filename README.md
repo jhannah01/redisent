@@ -32,19 +32,19 @@ Successfully installed redisent-0.0.1
 
 ### Development Installation
 
-For bleeding-edge changes and releases, the ``redisent`` package can be installed using ``pip`` with the URL to this [project on GitHub](https://github.com/jhannah01/redisent):
+For bleeding-edge changes and releases, the ``redisent`` package can be installed using ``pip`` with the URL to this [project on GitHub](https://github.com/synistree/redisent):
 
 ```shell
-$ pip install git+ssh://git@github.com/jhannah01/redisent
-Collecting git+ssh://****@github.com/jhannah01/redisent
-  Cloning ssh://****@github.com/jhannah01/redisent to /private/var/folders/7d/h7_kc94d4wdf1gz35mwfkr1m0000gn/T/pip-req-build-f50ebj91
-  Running command git clone -q 'ssh://****@github.com/jhannah01/redisent' /private/var/folders/7d/h7_kc94d4wdf1gz35mwfkr1m0000gn/T/pip-req-build-f50ebj91
+$ pip install git+ssh://git@github.com/synistree/redisent
+Collecting git+ssh://****@github.com/synistree/redisent
+  Cloning ssh://****@github.com/synistree/redisent to /private/var/folders/7d/h7_kc94d4wdf1gz35mwfkr1m0000gn/T/pip-req-build-f50ebj91
+  Running command git clone -q 'ssh://****@github.com/synistree/redisent' /private/var/folders/7d/h7_kc94d4wdf1gz35mwfkr1m0000gn/T/pip-req-build-f50ebj91
 ```
 
 For anyone who might also be making modifications to ``redisent`` as well as using it with another application virtual environment, the ``pip`` argument ``--editable`` should be used with a locally checked out version of ``redisent``:
 
 ```shell
-$ git clone https://github.com/jhannah01/redisent ~/code/redisent
+$ git clone https://github.com/synistree/redisent ~/code/redisent
 $ cd ~/code/myproject
 $ source ./activate
 [venv] $ pip install --editable ~/code/redisent

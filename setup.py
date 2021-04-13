@@ -22,10 +22,10 @@ setuptools.setup(
     keywords='redis, serialization',
     long_description=readme_contents,
     long_description_content_type='text/markdown',
-    url='https://github.com/jhannah01/redisent',
+    url='https://github.com/synistree/redisent',
     project_urls={
         'Documentation': 'https://redisent.readthedocs.io/en/latest/',
-        'Source Code': 'https://github.com/jhannah01/redisent'},
+        'Source Code': 'https://github.com/synistree/redisent'},
     package_dir={'': 'src'},
     packages=setuptools.find_packages(where='src'),
     python_requires='>=3.8',
