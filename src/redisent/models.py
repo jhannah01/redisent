@@ -5,7 +5,7 @@ import pickle
 
 from dataclasses import dataclass, field, fields, asdict, Field
 from tabulate import tabulate
-from typing import Mapping, Any, List, Optional, MutableMapping, Union, cast
+from typing import Mapping, Any, List, Optional, MutableMapping, cast
 
 from redisent import RedisentHelper
 from redisent.errors import RedisError
@@ -267,9 +267,8 @@ class RedisEntry:
         if check_exists and not helper.exists(redis_id):
             raise RedisError(f'Failed to find entry for "{redis_id}" in Redis while fetching all instances')
 
-        ent_keys = helper.keys(redis_id=redis_id, use_encoding='utf-8')
+        ent_keys = helper.keys(redis_id=redis_id)
         return {e_key: cls.fetch(helper, redis_id=redis_id, redis_name=e_key) for e_key in ent_keys}
-
 
     @classmethod
     def fetch(cls, helper: RedisentHelper, redis_id: str, redis_name: str = None, check_exists: bool = True) -> RedisEntry:

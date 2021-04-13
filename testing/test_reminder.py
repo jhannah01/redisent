@@ -15,7 +15,7 @@ class TestReminder(unittest.TestCase):
         self.rh = RedisentHelper(pool, use_redis=tmp_redis)
 
     def _build_reminder(self, use_dt: datetime = None, num_minutes: int = 5, created_ts: float = None,
-                        create_invalid: bool = False) -> Reminder:
+                        create_invalid: bool = False):
         use_dt = use_dt or datetime.now()
         trigger_dt = use_dt + timedelta(minutes=num_minutes)
 
@@ -30,7 +30,7 @@ class TestReminder(unittest.TestCase):
         if create_invalid:
             rem_kwargs['redis_name'] = {'bad': 'values', 'other': 5}
 
-        return Reminder(**rem_kwargs)
+        return Reminder(**rem_kwargs)  # type: ignore[arg-type]
 
     def test_store_reminder(self):
         rem = self._build_reminder()

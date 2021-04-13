@@ -58,7 +58,7 @@ class TestRedisent(unittest.TestCase):
         assert 'boop' in res, f'Could not find hash entry "boop" in key "beep". Got: {res}'
 
         rh_hkeys = self.rh.keys(redis_id='beep')
-        assert b'boop' in rh_hkeys, f'Could not find entry "boop" in key "beep". Got: {rh_hkeys}'
+        assert 'boop' in rh_hkeys, f'Could not find entry "boop" in key "beep". Got: {rh_hkeys}'
 
         with self.rh.wrapped_redis(op_name='hget(beep, boop)') as r_conn:
             res = float(r_conn.hget('beep', 'boop'))

@@ -1,3 +1,3 @@
-import redislite
+import redislite.client
 
-tmp_redis = redislite.Redis()
+tmp_redis = redislite.client.Redis()

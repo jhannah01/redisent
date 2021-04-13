@@ -9,14 +9,14 @@ from contextlib import contextmanager
 from typing import Callable, List, Any, Optional, Union, cast
 
 from redisent.errors import RedisError
-from redisent.common import RedisType, is_redislite_instance
+from redisent.common import RedisType, RedisPoolType
 
 logger = logging.getLogger(__name__)
 
 
 class RedisentHelper:
-    redis_pool: redis.ConnectionPool
-    use_redis: RedisType = None
+    redis_pool: RedisPoolType
+    use_redis: Optional[RedisType]
 
     @classmethod
     def handle_decode_attempt(cls, result_value, use_encoding: str = None, decode_handler: Callable[[Any], Optional[Any]] = None):
@@ -99,7 +99,7 @@ class RedisentHelper:
         conn_cls = redis.StrictRedis if strict_client else redis.Redis
         return conn_cls(connection_pool=self.redis_pool)
 
-    def __init__(self, redis_pool: redis.ConnectionPool, use_redis: RedisType = None) -> None:
+    def __init__(self, redis_pool: RedisPoolType, use_redis: RedisType = None) -> None:
         """
         Simple ``ctor`` method for building ``RedisentHelper`` instance from a given ``RedisPoolType``
 
@@ -109,17 +109,13 @@ class RedisentHelper:
                           provided ``redis_pool`` (which is ignored)
         """
 
-        if is_redislite_instance(redis_pool):
-            self.use_redis = redis_pool
-            self.redis_pool = cast(redis.ConnectionPool, use_redis)
-        else:
-            self.redis_pool = redis_pool
-            self.use_redis = use_redis
+        self.redis_pool = redis_pool
+        self.use_redis = use_redis
 
     @classmethod
-    def build_pool(cls, redis_uri: str) -> redis.ConnectionPool:
+    def build_pool(cls, redis_uri: str) -> RedisPoolType:
         """
-        Build a ``redis.ConnectionPool`` instance from the given Redis URI
+        Build a ``RedisPoolType`` instance from the given Redis URI
 
         This method uses ``redis.connection.ConnectionPool.from_url`` under the hood to build the connection pool
 
@@ -129,7 +125,7 @@ class RedisentHelper:
         if not redis_uri.startswith('/') and not redis_uri.startswith('redis://'):
             redis_uri = f'redis://{redis_uri}'
 
-        return redis.ConnectionPool.from_url(redis_uri)
+        return RedisPoolType.from_url(redis_uri)
 
     @contextmanager
     def wrapped_redis(self, op_name: str = None):
@@ -149,7 +145,7 @@ class RedisentHelper:
             logger.exception(err_message)
             raise RedisError(err_message, base_exception=ex, related_command=op_name)
 
-    def keys(self, use_pattern: str = None, redis_id: str = None, use_encoding: str = None) -> Union[List[bytes], List[str]]:
+    def keys(self, use_pattern: str = None, redis_id: str = None, use_encoding: str = None) -> List[str]:
         """
         Synchronous method responsible for enumerating key values in Redis for hash and non-hash entries alike
 
@@ -161,8 +157,10 @@ class RedisentHelper:
 
         :param use_pattern: if provided, use this value instead of ``*`` with ``KEYS``
         :param redis_id: if provided, use ``HKEYS(redis_id)`` to lookup keys in the hash entry
-        :param use_encoding: if provided, key values will be decoded using the value (generally this would be ``utf-8``)
+        :param use_encoding: if provided, use this charset to decode bytes response (default is ``utf-8``)
         """
+
+        use_encoding = use_encoding or 'utf-8'
 
         if redis_id:
             op_name = f'hkeys("{redis_id}")'
@@ -171,10 +169,7 @@ class RedisentHelper:
             op_name = f'keys("{use_pattern}")'
 
         with self.wrapped_redis(op_name) as r_conn:
-            found_keys: List[bytes] = r_conn.hkeys(redis_id) if redis_id else r_conn.keys(use_pattern)
-
-        if not use_encoding:
-            return found_keys
+            found_keys = r_conn.hkeys(redis_id) if redis_id else r_conn.keys(use_pattern)
 
         return [k_val.decode(use_encoding) for k_val in found_keys]
 

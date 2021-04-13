@@ -12,7 +12,7 @@ with open('docs/requirements.txt', 'rt') as f:
 
 with open('testing/requirements.txt', 'rt') as f:
     test_requirements = [req.rstrip('\n') for req in f.readlines()]
-    
+
 
 setuptools.setup(
     name='redisent',
@@ -29,6 +29,7 @@ setuptools.setup(
     package_dir={'': 'src'},
     packages=setuptools.find_packages(where='src'),
     python_requires='>=3.8',
+    zip_safe=False,
     extras_require={
         'dev': ['IPython', 'jupyterlab'],
         'test': test_requirements,
@@ -36,8 +37,7 @@ setuptools.setup(
     },
     include_package_data=True,
     package_data={
-        'redisent': ['py.typed']
+        'redisent': ['py.typed', '*.pyi']
     },
-    install_requires=install_requirements,
-    # license=''
+    install_requires=install_requirements
 )
