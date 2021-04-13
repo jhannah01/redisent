@@ -4,8 +4,12 @@ Introducing `redisent`, a Python library which leverages Python [dataclasses](ht
 
 Under the hood, Python [pickle](https://docs.python.org/3/library/pickle.html) library is used to convert the `dataclass` field values in `byte` values that can be stored directly in Redis.
 
-Documentation Status: [![devel](https://readthedocs.org/projects/redisent/badge/?version=latest)](https://redisent.readthedocs.io/en/latest/?badge=latest) -- [![stable](https://readthedocs.org/projects/redisent/badge/?version=latest)](https://redisent.readthedocs.io/en/latest/?badge=stable)
-Build Status: [![devel](https://travis-ci.com/synistree/redisent.svg?branch=devel)](https://travis-ci.com/synistree/redisent)
+## Build Status
+
+| Branch | Documentation | Build |
+|--------|---------------|-------|
+| [devel](https://github.com/synistree/redisent/tree/devel) | [[![devel Documentation](https://readthedocs.org/projects/redisent/badge/?version=latest)](https://redisent.readthedocs.io/en/latest/?badge=latest) | [![devel](https://travis-ci.com/synistree/redisent.svg?branch=devel)](https://travis-ci.com/synistree/redisent) |
+| master | [![stable](https://readthedocs.org/projects/redisent/badge/?version=latest)](https://redisent.readthedocs.io/en/latest/?badge=stable) | [![master](https://travis-ci.com/synistree/redisent.svg?branch=master)](https://travis-ci.com/synistree/redisent)
 
 ## Quick Start
 
