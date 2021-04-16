@@ -6,7 +6,7 @@ import redis
 import functools
 
 from contextlib import contextmanager
-from typing import Callable, List, Any, Optional, Union, cast
+from typing import Callable, List, Any, Optional, cast
 
 from redisent.errors import RedisError
 from redisent.common import RedisType, RedisPoolType
@@ -211,7 +211,8 @@ class RedisentHelper:
 
         :param redis_id: the Redis ID for entry
         :param redis_name: if provided, attempt to lookup hashmap based on this value
-        :param throw_error: if set, a :py:exc:`redisent.errors.RedisError` exception will be raised if the entry cannot be fetched, otherwise ``None`` will be returned
+        :param throw_error: if set, a :py:exc:`redisent.errors.RedisError` exception will be raised if the entry cannot be fetched,
+                            otherwise ``None`` will be returned
         """
 
         if not self.exists(redis_id, redis_name=redis_name):
