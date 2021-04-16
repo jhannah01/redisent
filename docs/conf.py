@@ -23,6 +23,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.coverage',
     'sphinx.ext.viewcode',
+    'sphinx_markdown_tables',
     'recommonmark',
     'IPython.sphinxext.ipython_console_highlighting',
     'IPython.sphinxext.ipython_directive'
@@ -39,6 +40,7 @@ autodoc_default_options = {
     'undoc-members': True,
     'exclude-members': '__weakref__'
 }
+
 # autodoc_type_aliases = {
 #     'RedisType': 'redisent.common.RedisType',
 #     'RedisPoolType': 'redisent.common.RedisPoolType'
@@ -59,6 +61,10 @@ for name in dir(builtins):
 
 for cls_name in nitpick_classes:
     nitpick_ignore.append(('py:class', cls_name))
+
+source_parsers = {
+    '.md': 'recommonmark.parser.CommonMarkParser',
+}
 
 source_suffix = {
     '.rst': 'restructuredtext',
