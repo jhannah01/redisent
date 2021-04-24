@@ -28,7 +28,7 @@ setuptools.setup(
         'Source Code': 'https://github.com/synistree/redisent'},
     package_dir={'': 'src'},
     packages=setuptools.find_packages(where='src'),
-    python_requires='>=3.8',
+    python_requires='>=3.7',
     extras_require={
         'dev': ['IPython', 'jupyterlab'],
         'test': test_requirements,
