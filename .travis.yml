@@ -15,4 +15,4 @@ install:
   - pip install -U pip wheel tox-travis tox-envfile pytest-flake8
 
 script: tox
-  - py.test -v --config=setup.cfg ./testing
+  - py.test -v --flake8 ./testing
