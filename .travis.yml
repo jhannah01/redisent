@@ -12,8 +12,7 @@ python:
   - "3.9"
 
 install:
-  - pip install -U pip wheel tox-travis tox-envfile
-#  - pip install -r requirements.txt -r testing/requirements.txt
+  - pip install -U pip wheel tox-travis tox-envfile pytest-flake8
 
 script: tox
-  - py.test -vv -s --flake8 --config=setup.cfg ./testing
+  - py.test -v --config=setup.cfg ./testing
