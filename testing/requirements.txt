@@ -9,4 +9,5 @@ mock
 mypy
 coverage
 tox
+flake8
 redislite
