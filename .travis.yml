@@ -17,4 +17,3 @@ install:
 
 script: tox
   - py.test -vv -s --flake8 --config=setup.cfg ./testing
-  - tox 
