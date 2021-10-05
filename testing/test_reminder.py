@@ -19,7 +19,7 @@ class TestReminder(unittest.TestCase):
         use_dt = use_dt or datetime.now()
         trigger_dt = use_dt + timedelta(minutes=num_minutes)
 
-        rem_kwargs = {'redis_id': 'reminders', 'member_id': 12345, 'member_name': 'pytest User',
+        rem_kwargs = {'member_id': 12345, 'member_name': 'pytest User',
                       'channel_id': 54321, 'channel_name': '#pytest',
                       'provided_when': f'in {num_minutes} minutes', 'content': 'pytest reminder content',
                       'trigger_ts': trigger_dt.timestamp()}

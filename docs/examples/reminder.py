@@ -5,7 +5,7 @@ import dateparser
 from datetime import datetime
 from dataclasses import dataclass, field
 
-from typing import Union, Optional, Mapping, Any, MutableMapping
+from typing import Union, Optional, Mapping, Any, MutableMapping, ClassVar
 
 from redisent import RedisEntry
 
@@ -36,7 +36,7 @@ class FuzzyTime:
 
         return int(t_delta.total_seconds()) if t_delta else None
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, *args, **kwargs) -> None:
         res_time = dateparser.parse(self.provided_when, settings={'PREFER_DATES_FROM': 'future'})
         if not res_time:
             raise ValueError(f'Unable to resolve provided "when": {self.provided_when}')
@@ -59,6 +59,8 @@ class FuzzyTime:
 
 @dataclass
 class Reminder(RedisEntry):
+    redis_id: ClassVar[str] = 'reminders'
+
     member_id: str = field(default_factory=str)
     member_name: str = field(default_factory=str)
 
@@ -89,7 +91,7 @@ class Reminder(RedisEntry):
 
         return datetime.fromtimestamp(self.created_ts)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, *args, **kwargs) -> None:
         """
         Set the default "is_complete" field based on current timestamp and
         sets "redis_name" based on member and trigger attributes

@@ -5,7 +5,7 @@ import pickle
 
 from dataclasses import dataclass, field, fields, asdict, Field
 from tabulate import tabulate
-from typing import Mapping, Any, List, Optional, MutableMapping, cast
+from typing import Mapping, Any, Optional, MutableMapping, cast, ClassVar
 
 from redisent import RedisentHelper
 from redisent.errors import RedisError
@@ -60,10 +60,17 @@ class RedisEntry:
        Out[9]: {'value_one': 1, 'value_two': 2}
     """
 
-    redis_id: str = field(metadata={'redis_field': True})                                   #: Redis ID for this entry
-    redis_name: Optional[str] = field(default_factory=str, metadata={'redis_field': True})  #: Optional Redis hashmap name
+    # Redis ID -- class-level attribute
+    redis_id: ClassVar[str] = field(metadata={'internal_field': True})
 
-    def dump(self, include_redis_fields: bool = True) -> str:
+    # Redis Hash Key == optional instance attribute
+    redis_name: Optional[str] = field(default=None, metadata={'internal_field': True})
+
+    def __post_init__(self, *args, redis_name: str = None, **kwargs) -> None:
+        if redis_name:
+            self.redis_name = redis_name
+
+    def dump(self, include_internal_fields: bool = False) -> str:
         """
         Helper for dumping a textual representation of a particular :py:class:`redisent.models.RedisEntry` instance
         """
@@ -73,7 +80,7 @@ class RedisEntry:
         if self.redis_name:
             dump_out = f'{dump_out}, hash entry "{self.redis_name}":'
 
-        entry_attrs = self.get_entry_fields(include_redis_fields=include_redis_fields, include_internal_fields=False)
+        entry_attrs = self.get_entry_fields(include_internal_fields=include_internal_fields)
         entry_data = [[attr, getattr(self, attr)] for attr in entry_attrs]
         tbl = tabulate(entry_data, headers=['Attribute', 'Value'], tablefmt='presto')
 
@@ -82,45 +89,15 @@ class RedisEntry:
         return dump_out
 
     @classmethod
-    def get_entry_fields(cls, include_redis_fields: bool = False, include_internal_fields: bool = False) -> Mapping[str, Field]:
+    def get_entry_fields(cls, include_internal_fields: bool = False) -> Mapping[str, Field]:
         """
         Class method used for building a list of strings for each field name, based on the provided filering attributes
 
-        :param include_redis_fields: if set, include fields with metadata indicating they are Redis-related fields (i.e.
-                                     ``redis_id`` or ``redis_name``)
         :param include_internal_fields: if set, include internal fields which are used by ``redisent`` only (any marked
                                         with metadata attribute ``internal_field``)
         """
 
-        flds = {}
-
-        for fld in fields(cls):
-            is_redis_fld = fld.metadata.get('redis_field', False)
-            is_int_fld = fld.metadata.get('internal_field', False)
-
-            if is_redis_fld and not include_redis_fields:
-                continue
-
-            if is_int_fld and not include_internal_fields:
-                continue
-
-            if not fld.init:
-                continue
-
-            flds[fld.name] = fld
-
-        return flds
-
-    @property
-    def entry_fields(self) -> List[str]:
-        """
-        Property for returning a list of entry-only related fields
-
-        This method will not include any fields marked with metadata attributes ``redis_field`` or ``internal_field`` and thus
-        will only return fields related to this specific entry's dataclass definition
-        """
-
-        return list(self.get_entry_fields(include_redis_fields=False, include_internal_fields=False).keys())
+        return {fld.name: fld for fld in fields(cls) if include_internal_fields or not fld.metadata.get('internal_field', False)}
 
     @property
     def is_hashmap(self) -> bool:
@@ -133,7 +110,7 @@ class RedisEntry:
         return True if self.redis_name else False
 
     @classmethod
-    def load_dict(cls, redis_id: str, redis_name: str = None, **ent_kwargs) -> RedisEntry:
+    def load_dict(cls, redis_id: str = None, redis_name: str = None, **ent_kwargs) -> RedisEntry:
         """
         Class method for loading a RedisEntry from a provided dictionary of values
 
@@ -142,38 +119,37 @@ class RedisEntry:
         :param ent_kwargs: keyword arguments used to build entry values
         """
 
+        redis_id = redis_id or cls.redis_id
+
         if not redis_name:
             if 'redis_name' in ent_kwargs:
                 redis_name = ent_kwargs.pop('redis_name')
 
-        ent_fields = cls.get_entry_fields(include_redis_fields=False, include_internal_fields=False)
+        ent_fields = cls.get_entry_fields(include_internal_fields=False)
         cls_kwargs: MutableMapping[str, Any] = {attr: ent_kwargs[attr] for attr in ent_fields if attr in ent_kwargs}
 
-        cls_kwargs['redis_id'] = redis_id
         if redis_name:
             cls_kwargs['redis_name'] = redis_name
 
         return cls(**cls_kwargs)
 
-    def as_dict(self, include_redis_fields: bool = True, include_internal_fields: bool = False) -> Mapping[str, Any]:
+    def as_dict(self, include_internal_fields: bool = False) -> Mapping[str, Any]:
         """
         Return a mapping representing this entry by making use of :py:func:`dataclasses.asdict` along with optionally excluding any
         Redis-related (or internal) fields.
 
         By default no internal or redis fields (i.e. ``redis_id`` or ``redis_name``) are returned
 
-        :param include_redis_fields:    if set, include fields with metadata indicating they are Redis-related fields (i.e. ``redis_id``
-                                        or ``redis_name``)
         :param include_internal_fields: if set, include internal fields which are used by ``redisent`` only (any marked with metadata
                                         attribute ``internal_field``)
         """
 
         ent_dict = asdict(self)
 
-        if include_redis_fields and include_internal_fields:
+        if include_internal_fields:
             return ent_dict
 
-        flds = self.get_entry_fields(include_redis_fields=include_redis_fields, include_internal_fields=include_internal_fields)
+        flds = self.get_entry_fields(include_internal_fields=include_internal_fields)
         return {attr: value for attr, value in ent_dict.items() if attr in flds}
 
     @classmethod
@@ -191,7 +167,7 @@ class RedisEntry:
             ent: MutableMapping[str, Any] = pickle.loads(entry_bytes)
 
             if isinstance(ent, Mapping):
-                redis_id = ent.pop('redis_id', None)
+                redis_id = ent.pop('redis_id', cls.redis_id)
                 redis_id = use_redis_id or redis_id
 
                 if not redis_id:
@@ -212,8 +188,8 @@ class RedisEntry:
             logger.exception(err_message)
             raise RedisError(err_message, base_exception=ex)
         except Exception as ex:
-            err_message = 'General error while attempting to decode possible RedisEntry'
-            logger.exception(f'{err_message}: {ex}')
+            err_message = f'General error while attempting to decode possible RedisEntry: {ex}'
+            logger.exception(err_message)
             raise RedisError(err_message, base_exception=ex)
 
     @classmethod
@@ -231,7 +207,7 @@ class RedisEntry:
             as_mapping = True if entry.redis_name else False
 
         try:
-            return pickle.dumps(entry.as_dict(include_redis_fields=True, include_internal_fields=False) if as_mapping is True else entry)
+            return pickle.dumps(entry.as_dict(include_internal_fields=False) if as_mapping is True else entry)
         except Exception as ex:
             ent_str = f' (entry name: "{entry.redis_name}")' if entry.redis_name else ''
             raise Exception(f'Error encoding entry for "{entry.redis_id}"{ent_str} using pickle: {ex}')
