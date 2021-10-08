@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import pickle
+import json
 
-from dataclasses import dataclass, field, fields, asdict, Field
+from dataclasses import dataclass, field, fields, asdict, Field, InitVar
 from tabulate import tabulate
 from typing import Mapping, Any, Optional, MutableMapping, cast, ClassVar
 
@@ -61,10 +62,10 @@ class RedisEntry:
     """
 
     # Redis ID -- class-level attribute
-    redis_id: ClassVar[str] = field(metadata={'internal_field': True})
+    redis_id: ClassVar[str]
 
     # Redis Hash Key == optional instance attribute
-    redis_name: Optional[str] = field(default=None, metadata={'internal_field': True})
+    redis_name: Optional[str] = field(default=False, init=False, metadata={'internal_field': True})
 
     def __post_init__(self, *args, redis_name: str = None, **kwargs) -> None:
         if redis_name:
@@ -133,7 +134,7 @@ class RedisEntry:
 
         return cls(**cls_kwargs)
 
-    def as_dict(self, include_internal_fields: bool = False) -> Mapping[str, Any]:
+    def as_dict(self, include_internal_fields: bool = False, use_json: bool = False, ignore_invalid: bool = True) -> Mapping[str, Any]:
         """
         Return a mapping representing this entry by making use of :py:func:`dataclasses.asdict` along with optionally excluding any
         Redis-related (or internal) fields.
@@ -146,11 +147,29 @@ class RedisEntry:
 
         ent_dict = asdict(self)
 
-        if include_internal_fields:
-            return ent_dict
+        if not use_json:
+            if include_internal_fields:
+                return ent_dict
 
-        flds = self.get_entry_fields(include_internal_fields=include_internal_fields)
-        return {attr: value for attr, value in ent_dict.items() if attr in flds}
+            flds = self.get_entry_fields(include_internal_fields=include_internal_fields)
+            return {attr: value for attr, value in ent_dict.items() if attr in flds}
+
+        ent_json = {}
+
+        for attr, value in ent_dict.items():
+            try:
+                if isinstance(value, RedisEntry):
+                    json_val = value.as_dict(include_internal_fields=include_internal_fields, use_json=use_json, ignore_invalid=ignore_invalid)
+                else:
+                    json_val = json.dumps(value)
+                ent_json[attr] = json_val
+            except Exception as ex:
+                if not ignore_invalid:
+                    raise ex
+
+                continue
+
+        return ent_json
 
     @classmethod
     def decode_entry(cls, entry_bytes, use_redis_id: str = None, use_redis_name: str = None):
